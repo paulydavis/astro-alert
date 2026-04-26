@@ -30,6 +30,59 @@ python3 gui.py
 
 ![Schedule](screenshots/schedule.png)
 
+**Settings** — enter your Gmail address and App Password. Credentials are saved to your OS user data directory (never next to the source files).
+
+## Packaged app (no Python required)
+
+You can build a self-contained app from source with one command. The result runs on any machine of the same OS — no Python installation needed.
+
+### macOS → `AstroAlert.app`
+
+```bash
+bash build.sh
+# Output: dist/AstroAlert.app
+cp -r dist/AstroAlert.app /Applications/
+```
+
+Double-click **AstroAlert** in your Applications folder. On first launch macOS Gatekeeper will block it because it isn't signed. Right-click the app → **Open** → **Open** to allow it once. After that it opens normally.
+
+### Windows → `AstroAlert.exe`
+
+Double-click **`build.bat`** (or run it from a command prompt that has Python on its PATH).
+
+```
+Output: dist\AstroAlert.exe
+```
+
+Copy `AstroAlert.exe` anywhere you like and double-click it. Windows SmartScreen will warn about an unsigned app — click **More info** → **Run anyway** to proceed.
+
+### Linux → `AstroAlert` binary
+
+```bash
+bash build.sh
+# Output: dist/AstroAlert
+chmod +x dist/AstroAlert
+./dist/AstroAlert
+```
+
+To add it to your application menu, copy the binary to a permanent location and edit `AstroAlert.desktop` to point `Exec=` at it, then install with:
+
+```bash
+cp AstroAlert.desktop ~/.local/share/applications/
+```
+
+### Code signing (optional — removes OS warnings)
+
+Both Gatekeeper and SmartScreen warnings go away when the app is signed by a trusted certificate authority.
+
+| Platform | Option | Cost | Notes |
+|---|---|---|---|
+| Windows | **Azure Trusted Signing** | ~$10/month | Microsoft's own CA; establishes SmartScreen reputation immediately; no hardware token |
+| Windows | EV certificate | ~$300–500/year | DigiCert, Sectigo, GlobalSign; ships a USB hardware token for local signing |
+| macOS | Apple Developer Program | $99/year | Required for Gatekeeper notarisation; sign with `codesign`, notarise with `xcrun notarytool` |
+
+For a personal or open-source project distributed via GitHub Releases, the unsigned warnings are normal and most users expect them. The "right-click → Open" / "More info → Run anyway" workarounds are one-time steps.
+
 ## How it works
 
 Every evening at **6pm**, an email arrives with tomorrow night's forecast across all configured sites — so you have time to plan a dark site trip. At **2pm**, a second check runs for tonight; that email only sends if at least one site scores GO.
@@ -74,17 +127,23 @@ pip install requests ephem python-dotenv
 
 ### 2. Configure credentials
 
-```bash
-cp .env.example .env
-```
+**Option A — GUI (easiest):** open `python3 gui.py`. If no credentials are configured, the app opens directly on the **Settings** tab. Enter your Gmail address and App Password and click **Save Credentials**.
 
-Edit `.env` with your credentials. Never commit `.env`.
+**Option B — manually:** copy `.env.example` to `.env` (in the same directory as the source) and fill in your details. Never commit `.env`.
 
 ```
 GMAIL_USER=you@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx   # Google App Password (not your login password)
-ALERT_EMAIL_TO=you@gmail.com
+ALERT_EMAIL_TO=you@gmail.com             # optional — defaults to GMAIL_USER
 ```
+
+When running from a packaged app, credentials are saved to your OS user data directory instead:
+
+| OS | Path |
+|---|---|
+| macOS | `~/Library/Application Support/AstroAlert/.env` |
+| Windows | `%APPDATA%\AstroAlert\.env` |
+| Linux | `~/.config/AstroAlert/.env` |
 
 To create a Gmail App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) (requires 2-Step Verification).
 
@@ -202,8 +261,10 @@ Sites are listed in drive-time order (shortest first). The subject line calls ou
 
 ```
 astro_alert/
-├── astro_alert.py       # CLI entry point
-├── gui.py               # Tkinter GUI (dashboard, sites, schedule)
+├── main.py              # Entry point: GUI when run bare, CLI when run with args
+├── astro_alert.py       # CLI entry point and argument parser
+├── gui.py               # Tkinter GUI (dashboard, sites, schedule, settings)
+├── data_dir.py          # Platform-aware user data directory
 ├── scheduler_setup.py   # Cross-platform cron / Task Scheduler install
 ├── site_manager.py      # Load/save sites.json
 ├── weather.py           # Open-Meteo weather fetch
@@ -212,10 +273,15 @@ astro_alert/
 ├── scorer.py            # Bortle-aware 0–100 scoring
 ├── gmail_notifier.py    # Gmail SMTP email sender
 ├── notifier.py          # Alert dispatch
-├── sites.json           # Site database
-├── .env                 # Credentials (never commit)
+├── sites.json           # Site database (your locations)
+├── sites.example.json   # Starter template
+├── .env                 # Credentials for dev use (never commit)
 ├── .env.example         # Credential template
-└── test_*.py            # pytest test suite
+├── AstroAlert.spec      # PyInstaller build spec (cross-platform)
+├── build.sh             # Build script for macOS / Linux
+├── build.bat            # Build script for Windows
+├── AstroAlert.desktop   # Linux app menu entry template
+└── test_*.py            # pytest test suite (274 tests)
 ```
 
 ## Running tests
