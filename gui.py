@@ -566,7 +566,7 @@ class AstroAlertApp(tk.Tk):
         self._pass_shown    = False
 
         fields = [
-            ("Email address",    self._cred_user_var, False),
+            ("Email used to send alerts", self._cred_user_var, False),
             ("App password",     self._cred_pass_var, True),
             ("Alert recipient",  self._cred_to_var,   False),
         ]
