@@ -576,6 +576,7 @@ class AstroAlertApp(tk.Tk):
             entry = ttk.Entry(card, textvariable=var, font=(FONT_PROP, 12), width=36,
                               show="•" if is_pass else "")
             entry.grid(row=row_idx, column=1, sticky="ew", pady=8)
+            entry.bind("<FocusOut>", lambda e: self._save_credentials(silent=True))
             if is_pass:
                 self._pass_entry = entry
                 ttk.Button(card, text="Show", width=6,
@@ -610,9 +611,10 @@ class AstroAlertApp(tk.Tk):
         ]):
             ttk.Label(self._smtp_detail_frame, text=label + ":", style="CardDim.TLabel").grid(
                 row=row_idx, column=0, sticky="w", pady=8, padx=(16, 12))
-            ttk.Entry(self._smtp_detail_frame, textvariable=var,
-                      font=(FONT_PROP, 12), width=36).grid(
-                row=row_idx, column=1, sticky="ew", pady=8)
+            smtp_entry = ttk.Entry(self._smtp_detail_frame, textvariable=var,
+                                   font=(FONT_PROP, 12), width=36)
+            smtp_entry.grid(row=row_idx, column=1, sticky="ew", pady=8)
+            smtp_entry.bind("<FocusOut>", lambda e: self._save_credentials(silent=True))
 
         btn_row = ttk.Frame(inner)
         btn_row.pack(pady=(20, 0))
@@ -690,7 +692,7 @@ class AstroAlertApp(tk.Tk):
             self._smtp_port_var.set(vals.get("SMTP_PORT", "587"))
             self._smtp_detail_frame.pack(fill="x", ipadx=28, ipady=12)
 
-    def _save_credentials(self):
+    def _save_credentials(self, silent=False):
         import unicodedata
         from data_dir import ENV_FILE
         from dotenv import set_key, unset_key
@@ -717,8 +719,9 @@ class AstroAlertApp(tk.Tk):
             unset_key(ENV_FILE, "SMTP_PORT")
         self._refresh_cred_banner()
         self._set_status("Credentials saved.")
-        messagebox.showinfo("Saved", "Credentials saved. Send a test email to verify.",
-                            parent=self)
+        if not silent:
+            messagebox.showinfo("Saved", "Credentials saved. Send a test email to verify.",
+                                parent=self)
 
     def _search_home_location(self):
         query = self._home_search_var.get().strip()
