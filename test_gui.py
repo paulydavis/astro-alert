@@ -72,6 +72,14 @@ def root():
         r.destroy()
 
 
+@pytest.fixture()
+def fake_env(tmp_path, monkeypatch):
+    path = tmp_path / ".env"
+    import data_dir
+    monkeypatch.setattr(data_dir, "ENV_FILE", path)
+    return path
+
+
 # ── AstroAlertApp: initialisation ─────────────────────────────────────────────
 
 class TestAppInit:
@@ -798,7 +806,7 @@ class TestSettingsTab:
 
     def test_load_credentials_sets_vars_from_env_file(self, app, tmp_path, monkeypatch):
         fake_env = tmp_path / ".env"
-        fake_env.write_text("GMAIL_USER=test@example.com\nGMAIL_APP_PASSWORD=secret\n")
+        fake_env.write_text("SMTP_USER=test@example.com\nSMTP_PASSWORD=secret\n")
         import data_dir
         monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
         app._load_credentials_to_form()
@@ -822,8 +830,8 @@ class TestSettingsTab:
             app._save_credentials()
         from dotenv import dotenv_values
         vals = dotenv_values(fake_env)
-        assert vals["GMAIL_USER"] == "me@gmail.com"
-        assert vals["GMAIL_APP_PASSWORD"] == "mypassword"
+        assert vals["SMTP_USER"] == "me@gmail.com"
+        assert vals["SMTP_PASSWORD"] == "mypassword"
 
     def test_save_credentials_omits_empty_fields(self, app, tmp_path, monkeypatch):
         fake_env = tmp_path / ".env"
@@ -835,7 +843,7 @@ class TestSettingsTab:
         with patch("tkinter.messagebox.showinfo"):
             app._save_credentials()
         content = fake_env.read_text()
-        assert "GMAIL_APP_PASSWORD" not in content
+        assert "SMTP_PASSWORD" not in content
 
     def test_toggle_password_reveals_text(self, app):
         assert app._pass_shown is False
@@ -857,7 +865,7 @@ class TestSettingsTab:
         mock_thread.assert_called_once()
 
     def test_test_email_done_success_shows_info(self, app):
-        from gmail_notifier import EmailResult
+        from smtp_notifier import EmailResult
         result = EmailResult(sent=True)
         with patch("tkinter.messagebox.showinfo") as mock_info:
             app._test_email_done(result)
@@ -865,7 +873,7 @@ class TestSettingsTab:
         assert str(app._test_btn.cget("state")) == "normal"
 
     def test_test_email_done_failure_shows_error(self, app):
-        from gmail_notifier import EmailResult
+        from smtp_notifier import EmailResult
         result = EmailResult(sent=False, error="Auth failed")
         with patch("tkinter.messagebox.showerror") as mock_err:
             app._test_email_done(result)
@@ -874,7 +882,7 @@ class TestSettingsTab:
 
     def test_cred_warn_hidden_when_credentials_present(self, app, tmp_path, monkeypatch):
         fake_env = tmp_path / ".env"
-        fake_env.write_text("GMAIL_USER=u@g.com\nGMAIL_APP_PASSWORD=pw\n")
+        fake_env.write_text("SMTP_USER=u@g.com\nSMTP_PASSWORD=pw\n")
         import data_dir
         monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
         app._refresh_cred_banner()
@@ -909,9 +917,49 @@ class TestSettingsTab:
 
     def test_check_first_run_stays_on_dashboard_when_creds_present(self, app, tmp_path, monkeypatch):
         fake_env = tmp_path / ".env"
-        fake_env.write_text("GMAIL_USER=u@g.com\nGMAIL_APP_PASSWORD=pw\n")
+        fake_env.write_text("SMTP_USER=u@g.com\nSMTP_PASSWORD=pw\n")
         import data_dir
         monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
         app._nb.select(app._tab_dash)
         app._check_first_run()
         assert app._nb.index("current") == app._nb.index(app._tab_dash)
+
+    def test_load_credentials_ticks_smtp_checkbox_for_custom_host(self, app, fake_env):
+        fake_env.write_text(
+            "SMTP_USER=me@outlook.com\nSMTP_PASSWORD=pw\n"
+            "SMTP_HOST=smtp-mail.outlook.com\nSMTP_PORT=587\n"
+        )
+        app._load_credentials_to_form()
+        assert app._smtp_custom_var.get() is True
+        assert app._smtp_host_var.get() == "smtp-mail.outlook.com"
+        assert app._smtp_port_var.get() == "587"
+
+    def test_load_credentials_does_not_tick_smtp_checkbox_for_gmail(self, app, fake_env):
+        fake_env.write_text("SMTP_USER=me@gmail.com\nSMTP_PASSWORD=pw\n")
+        app._load_credentials_to_form()
+        assert app._smtp_custom_var.get() is False
+
+    def test_save_credentials_writes_smtp_host_when_checkbox_ticked(self, app, fake_env):
+        from dotenv import dotenv_values
+        fake_env.touch()
+        app._cred_user_var.set("me@outlook.com")
+        app._cred_pass_var.set("mypassword")
+        app._smtp_custom_var.set(True)
+        app._smtp_host_var.set("smtp-mail.outlook.com")
+        app._smtp_port_var.set("587")
+        app._save_credentials()
+        vals = dotenv_values(fake_env)
+        assert vals["SMTP_USER"] == "me@outlook.com"
+        assert vals["SMTP_HOST"] == "smtp-mail.outlook.com"
+        assert vals["SMTP_PORT"] == "587"
+
+    def test_save_credentials_omits_smtp_host_when_checkbox_unticked(self, app, fake_env):
+        from dotenv import dotenv_values
+        fake_env.touch()
+        app._cred_user_var.set("me@gmail.com")
+        app._cred_pass_var.set("mypassword")
+        app._smtp_custom_var.set(False)
+        app._save_credentials()
+        vals = dotenv_values(fake_env)
+        assert "SMTP_HOST" not in vals
+        assert "SMTP_PORT" not in vals
