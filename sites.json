@@ -1,0 +1,95 @@
+{
+  "active_site": "durham_home",
+  "sites": {
+    "staunton_river": {
+      "name": "Staunton River State Park",
+      "lat": 36.696,
+      "lon": -78.685,
+      "elevation_m": 110,
+      "bortle": 2,
+      "timezone": "America/New_York",
+      "drive_min": 120,
+      "notes": "IDA certified, best overall"
+    },
+    "james_river": {
+      "name": "James River State Park",
+      "lat": 37.623,
+      "lon": -78.809,
+      "elevation_m": 169,
+      "bortle": 2,
+      "timezone": "America/New_York",
+      "drive_min": 120,
+      "notes": "IDA certified, call for permit"
+    },
+    "uwharrie": {
+      "name": "Uwharrie National Forest",
+      "lat": 35.418,
+      "lon": -80.089,
+      "elevation_m": 182,
+      "bortle": 3,
+      "timezone": "America/New_York",
+      "drive_min": 105,
+      "notes": "National forest, dispersed camping OK"
+    },
+    "bladen_lakes": {
+      "name": "Bladen Lakes State Forest",
+      "lat": 34.714,
+      "lon": -78.575,
+      "elevation_m": 28,
+      "bortle": 3,
+      "timezone": "America/New_York",
+      "drive_min": 120,
+      "notes": "Flat, SE horizon, 24hr access"
+    },
+    "medoc_mountain": {
+      "name": "Medoc Mountain State Park",
+      "lat": 36.264,
+      "lon": -77.888,
+      "elevation_m": 99,
+      "bortle": 4,
+      "timezone": "America/New_York",
+      "drive_min": 70,
+      "notes": "Best dark site inside 90min"
+    },
+    "little_river": {
+      "name": "Little River Regional Park",
+      "lat": 36.162,
+      "lon": -78.971,
+      "elevation_m": 174,
+      "bortle": 4,
+      "timezone": "America/New_York",
+      "drive_min": 48,
+      "notes": "CHAOS events monthly"
+    },
+    "eno_river": {
+      "name": "Eno River State Park",
+      "lat": 36.078,
+      "lon": -79.005,
+      "elevation_m": 157,
+      "bortle": 5,
+      "timezone": "America/New_York",
+      "drive_min": 40,
+      "notes": "Quick option near Durham"
+    },
+    "jordan_lake": {
+      "name": "Jordan Lake SRA",
+      "lat": 35.737,
+      "lon": -79.017,
+      "elevation_m": 72,
+      "bortle": 5,
+      "timezone": "America/New_York",
+      "drive_min": 36,
+      "notes": "RAC/RACOBS sessions"
+    },
+    "durham_home": {
+      "name": "Durham Home",
+      "lat": 35.994,
+      "lon": -78.899,
+      "elevation_m": 123,
+      "bortle": 7,
+      "timezone": "America/New_York",
+      "drive_min": null,
+      "notes": "Backyard/testing only"
+    }
+  }
+}
