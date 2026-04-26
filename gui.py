@@ -202,7 +202,7 @@ class AstroAlertApp(tk.Tk):
     def _build_dashboard(self, parent):
         # Credential warning banner (hidden until _refresh_cred_banner decides)
         self._cred_warn = tk.Frame(parent, bg=WARN_CLR)
-        tk.Label(self._cred_warn, text="⚠  Gmail credentials not configured — alerts won't send.",
+        tk.Label(self._cred_warn, text="⚠  Email credentials not configured — alerts won't send.",
                  bg=WARN_CLR, fg="#000000", font=(FONT_PROP, 12)).pack(side="left",
                  padx=16, pady=8)
         ttk.Button(self._cred_warn, text="Set up →",
@@ -550,7 +550,7 @@ class AstroAlertApp(tk.Tk):
         inner = ttk.Frame(parent)
         inner.pack(expand=True)
 
-        ttk.Label(inner, text="Gmail Credentials",
+        ttk.Label(inner, text="Email Credentials",
                   font=(FONT_PROP, 17, "bold")).pack(pady=(0, 5))
         ttk.Label(inner,
                   text="Used to send nightly go/no-go alerts. Credentials are stored locally.",
@@ -566,7 +566,7 @@ class AstroAlertApp(tk.Tk):
         self._pass_shown    = False
 
         fields = [
-            ("Gmail address",    self._cred_user_var, False),
+            ("Email address",    self._cred_user_var, False),
             ("App password",     self._cred_pass_var, True),
             ("Alert recipient",  self._cred_to_var,   False),
         ]
@@ -583,9 +583,36 @@ class AstroAlertApp(tk.Tk):
                     row=row_idx, column=2, padx=(8, 16), pady=8)
 
         ttk.Label(card,
-                  text="Tip: use a Gmail App Password, not your main password.",
+                  text="Tip: use an App Password or your provider's equivalent, not your login password.",
                   style="CardDim.TLabel").grid(
             row=len(fields), column=0, columnspan=3, pady=(4, 0), padx=16)
+
+        self._smtp_custom_var = tk.BooleanVar(value=False)
+        self._smtp_host_var   = tk.StringVar(value="smtp.gmail.com")
+        self._smtp_port_var   = tk.StringVar(value="587")
+
+        smtp_toggle_frame = ttk.Frame(inner)
+        smtp_toggle_frame.pack(fill="x", pady=(10, 0))
+        ttk.Checkbutton(
+            smtp_toggle_frame,
+            text="Use a different email provider (custom SMTP)",
+            variable=self._smtp_custom_var,
+            command=self._on_smtp_toggle,
+        ).pack(anchor="w", padx=16)
+
+        self._smtp_detail_frame = ttk.Frame(inner, style="Card.TFrame")
+        self._smtp_detail_frame.columnconfigure(1, weight=1)
+        self._smtp_detail_frame.pack(fill="x", ipadx=28, ipady=12)
+        self._smtp_detail_frame.pack_forget()
+        for row_idx, (label, var) in enumerate([
+            ("SMTP host", self._smtp_host_var),
+            ("SMTP port", self._smtp_port_var),
+        ]):
+            ttk.Label(self._smtp_detail_frame, text=label + ":", style="CardDim.TLabel").grid(
+                row=row_idx, column=0, sticky="w", pady=8, padx=(16, 12))
+            ttk.Entry(self._smtp_detail_frame, textvariable=var,
+                      font=(FONT_PROP, 12), width=36).grid(
+                row=row_idx, column=1, sticky="ew", pady=8)
 
         btn_row = ttk.Frame(inner)
         btn_row.pack(pady=(20, 0))
@@ -649,29 +676,45 @@ class AstroAlertApp(tk.Tk):
         from data_dir import ENV_FILE
         from dotenv import dotenv_values
         vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
-        self._cred_user_var.set(vals.get("GMAIL_USER", ""))
-        self._cred_pass_var.set(vals.get("GMAIL_APP_PASSWORD", ""))
+        smtp_user = vals.get("SMTP_USER") or vals.get("GMAIL_USER", "")
+        smtp_pass = vals.get("SMTP_PASSWORD") or vals.get("GMAIL_APP_PASSWORD", "")
+        self._cred_user_var.set(smtp_user)
+        self._cred_pass_var.set(smtp_pass)
         self._cred_to_var.set(vals.get("ALERT_EMAIL_TO", ""))
         self._home_lat_var.set(vals.get("HOME_LAT", ""))
         self._home_lon_var.set(vals.get("HOME_LON", ""))
+        smtp_host = vals.get("SMTP_HOST", "")
+        if smtp_host and smtp_host != "smtp.gmail.com":
+            self._smtp_custom_var.set(True)
+            self._smtp_host_var.set(smtp_host)
+            self._smtp_port_var.set(vals.get("SMTP_PORT", "587"))
+            self._smtp_detail_frame.pack(fill="x", ipadx=28, ipady=12)
 
     def _save_credentials(self):
         import unicodedata
         from data_dir import ENV_FILE
         from dotenv import set_key, unset_key
         def _norm(s): return unicodedata.normalize("NFKC", s).strip()
-        gmail_user = _norm(self._cred_user_var.get())
-        gmail_pass = _norm(self._cred_pass_var.get())
-        alert_to   = _norm(self._cred_to_var.get())
+        smtp_user = _norm(self._cred_user_var.get())
+        smtp_pass = _norm(self._cred_pass_var.get())
+        alert_to  = _norm(self._cred_to_var.get())
         ENV_FILE.touch()
-        if gmail_user:
-            set_key(ENV_FILE, "GMAIL_USER", gmail_user)
-        if gmail_pass:
-            set_key(ENV_FILE, "GMAIL_APP_PASSWORD", gmail_pass)
+        if smtp_user:
+            set_key(ENV_FILE, "SMTP_USER", smtp_user)
+        if smtp_pass:
+            set_key(ENV_FILE, "SMTP_PASSWORD", smtp_pass)
         if alert_to:
             set_key(ENV_FILE, "ALERT_EMAIL_TO", alert_to)
         else:
             unset_key(ENV_FILE, "ALERT_EMAIL_TO")
+        if self._smtp_custom_var.get():
+            smtp_host = _norm(self._smtp_host_var.get()) or "smtp.gmail.com"
+            smtp_port = _norm(self._smtp_port_var.get()) or "587"
+            set_key(ENV_FILE, "SMTP_HOST", smtp_host)
+            set_key(ENV_FILE, "SMTP_PORT", smtp_port)
+        else:
+            unset_key(ENV_FILE, "SMTP_HOST")
+            unset_key(ENV_FILE, "SMTP_PORT")
         self._refresh_cred_banner()
         self._set_status("Credentials saved.")
         messagebox.showinfo("Saved", "Credentials saved. Send a test email to verify.",
@@ -748,6 +791,12 @@ class AstroAlertApp(tk.Tk):
         self._pass_shown = not self._pass_shown
         self._pass_entry.configure(show="" if self._pass_shown else "•")
 
+    def _on_smtp_toggle(self):
+        if self._smtp_custom_var.get():
+            self._smtp_detail_frame.pack(fill="x", ipadx=28, ipady=12)
+        else:
+            self._smtp_detail_frame.pack_forget()
+
     def _send_test_email(self):
         self._test_btn.configure(state="disabled", text="Sending…")
         threading.Thread(target=self._do_test_email, daemon=True).start()
@@ -770,7 +819,9 @@ class AstroAlertApp(tk.Tk):
         from data_dir import ENV_FILE
         from dotenv import dotenv_values
         vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
-        has_creds = bool(vals.get("GMAIL_USER") and vals.get("GMAIL_APP_PASSWORD"))
+        smtp_user = vals.get("SMTP_USER") or vals.get("GMAIL_USER", "")
+        smtp_pass = vals.get("SMTP_PASSWORD") or vals.get("GMAIL_APP_PASSWORD", "")
+        has_creds = bool(smtp_user and smtp_pass)
         if has_creds:
             self._cred_warn.pack_forget()
         else:
@@ -780,7 +831,9 @@ class AstroAlertApp(tk.Tk):
         from data_dir import ENV_FILE
         from dotenv import dotenv_values
         vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
-        if not vals.get("GMAIL_USER") or not vals.get("GMAIL_APP_PASSWORD"):
+        smtp_user = vals.get("SMTP_USER") or vals.get("GMAIL_USER", "")
+        smtp_pass = vals.get("SMTP_PASSWORD") or vals.get("GMAIL_APP_PASSWORD", "")
+        if not smtp_user or not smtp_pass:
             self._nb.select(self._tab_settings)
 
     # ── Status bar ──────────────────────────────────────────────────────────────
