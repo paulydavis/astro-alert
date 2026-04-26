@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import astro_alert
-from astro_alert import build_parser, cmd_list_sites, cmd_add_site, cmd_run
+from astro_alert import build_parser, cmd_list_sites, cmd_add_site, cmd_run, _fetch_report
 from moon import MoonInfo
 from scorer import Score
 from gmail_notifier import SiteReport
@@ -263,3 +263,176 @@ class TestCmdRun:
                 with pytest.raises(SystemExit) as exc:
                     cmd_run(args)
         assert exc.value.code == 1
+
+    def test_moon_rise_printed_when_present(self, tmp_path, monkeypatch, capsys):
+        import site_manager as sm
+        p = tmp_path / "sites.json"
+        p.write_text(json.dumps(MINIMAL_SITES))
+        monkeypatch.setattr(sm, "SITES_FILE", p)
+
+        rise = datetime(2024, 1, 15, 21, 0, tzinfo=timezone.utc)
+        moon = MoonInfo(phase_pct=30, rise_utc=rise, set_utc=None,
+                        transit_utc=None, is_up_at_midnight=True)
+        score = Score(total=60, weather_score=25, seeing_score=20, moon_score=15,
+                      go=True, summary="Good.", warnings=[])
+        report = SiteReport(site_name="Home", drive_min=None, score=score, moon=moon)
+
+        args = build_parser().parse_args(["--dry-run"])
+        with patch("astro_alert._fetch_report", return_value=report):
+            cmd_run(args)
+
+        out = capsys.readouterr().out
+        assert "rises" in out
+        assert "21:00Z" in out
+
+    def test_moon_set_printed_when_present(self, tmp_path, monkeypatch, capsys):
+        import site_manager as sm
+        p = tmp_path / "sites.json"
+        p.write_text(json.dumps(MINIMAL_SITES))
+        monkeypatch.setattr(sm, "SITES_FILE", p)
+
+        moonset = datetime(2024, 1, 16, 2, 30, tzinfo=timezone.utc)
+        moon = MoonInfo(phase_pct=80, rise_utc=None, set_utc=moonset,
+                        transit_utc=None, is_up_at_midnight=False)
+        score = Score(total=40, weather_score=20, seeing_score=15, moon_score=5,
+                      go=False, summary="No-go.", warnings=[])
+        report = SiteReport(site_name="Home", drive_min=None, score=score, moon=moon)
+
+        args = build_parser().parse_args(["--dry-run"])
+        with patch("astro_alert._fetch_report", return_value=report):
+            cmd_run(args)
+
+        out = capsys.readouterr().out
+        assert "sets" in out
+        assert "02:30Z" in out
+
+
+# ---------------------------------------------------------------------------
+# _fetch_report
+# ---------------------------------------------------------------------------
+
+class TestFetchReport:
+    def _make_site(self):
+        site = MagicMock()
+        site.key = "test"
+        site.lat = 35.99
+        site.lon = -78.89
+        site.name = "Test Site"
+        site.drive_min = 30
+        site.bortle = 5
+        return site
+
+    def test_returns_site_report(self):
+        site = self._make_site()
+        mock_weather = MagicMock()
+        mock_seeing = MagicMock()
+        mock_moon = MagicMock()
+        mock_score = MagicMock()
+
+        with patch("astro_alert.fetch_weather", return_value=mock_weather), \
+             patch("astro_alert.fetch_seeing", return_value=mock_seeing), \
+             patch("astro_alert.get_moon_info", return_value=mock_moon), \
+             patch("astro_alert.score_night", return_value=mock_score):
+            result = _fetch_report(site, date(2024, 1, 15))
+
+        assert isinstance(result, SiteReport)
+        assert result.site_name == "Test Site"
+        assert result.drive_min == 30
+        assert result.score is mock_score
+        assert result.moon is mock_moon
+
+    def test_passes_target_date_to_weather(self):
+        site = self._make_site()
+        target = date(2024, 6, 1)
+        with patch("astro_alert.fetch_weather") as mock_fw, \
+             patch("astro_alert.fetch_seeing", return_value=MagicMock()), \
+             patch("astro_alert.get_moon_info", return_value=MagicMock()), \
+             patch("astro_alert.score_night", return_value=MagicMock()):
+            _fetch_report(site, target)
+        mock_fw.assert_called_once_with("test", 35.99, -78.89, target_date=target)
+
+    def test_passes_target_date_to_moon(self):
+        site = self._make_site()
+        target = date(2024, 6, 1)
+        with patch("astro_alert.fetch_weather", return_value=MagicMock()), \
+             patch("astro_alert.fetch_seeing", return_value=MagicMock()), \
+             patch("astro_alert.get_moon_info") as mock_moon, \
+             patch("astro_alert.score_night", return_value=MagicMock()):
+            _fetch_report(site, target)
+        mock_moon.assert_called_once_with(35.99, -78.89, target_date=target)
+
+    def test_passes_bortle_to_scorer(self):
+        site = self._make_site()
+        site.bortle = 3
+        mock_weather = MagicMock()
+        mock_seeing = MagicMock()
+        mock_moon = MagicMock()
+        target = date(2024, 6, 1)
+        with patch("astro_alert.fetch_weather", return_value=mock_weather), \
+             patch("astro_alert.fetch_seeing", return_value=mock_seeing), \
+             patch("astro_alert.get_moon_info", return_value=mock_moon), \
+             patch("astro_alert.score_night") as mock_score:
+            _fetch_report(site, target)
+        mock_score.assert_called_once_with(mock_weather, mock_seeing, mock_moon,
+                                           bortle=3, target_date=target)
+
+
+# ---------------------------------------------------------------------------
+# main() dispatch
+# ---------------------------------------------------------------------------
+
+class TestMain:
+    def test_main_dispatches_list_sites(self, tmp_path, monkeypatch, capsys):
+        import site_manager as sm
+        p = tmp_path / "sites.json"
+        p.write_text(json.dumps(MINIMAL_SITES))
+        monkeypatch.setattr(sm, "SITES_FILE", p)
+        monkeypatch.setattr(sys, "argv", ["astro_alert", "list-sites"])
+
+        astro_alert.main()
+        out = capsys.readouterr().out
+        assert "Home" in out
+
+    def test_main_dispatches_add_site(self, tmp_path, monkeypatch, capsys):
+        import site_manager as sm
+        p = tmp_path / "sites.json"
+        p.write_text(json.dumps(MINIMAL_SITES))
+        monkeypatch.setattr(sm, "SITES_FILE", p)
+        monkeypatch.setattr(sys, "argv", [
+            "astro_alert", "add-site", "new", "New Spot",
+            "36.0", "-79.0", "100", "3", "America/New_York"
+        ])
+
+        astro_alert.main()
+        data = json.loads(p.read_text())
+        assert "new" in data["sites"]
+
+    def test_main_add_site_error_exits(self, tmp_path, monkeypatch, capsys):
+        import site_manager as sm
+        p = tmp_path / "sites.json"
+        p.write_text(json.dumps(MINIMAL_SITES))
+        monkeypatch.setattr(sm, "SITES_FILE", p)
+        monkeypatch.setattr(sys, "argv", [
+            "astro_alert", "add-site", "home", "Duplicate",
+            "36.0", "-79.0", "100", "3", "America/New_York"
+        ])
+
+        with patch("astro_alert.cmd_add_site", side_effect=KeyError("home already exists")):
+            with pytest.raises(SystemExit) as exc:
+                astro_alert.main()
+        assert exc.value.code == 1
+
+    def test_main_dispatches_run(self, tmp_path, monkeypatch, capsys):
+        import site_manager as sm
+        p = tmp_path / "sites.json"
+        p.write_text(json.dumps(MINIMAL_SITES))
+        monkeypatch.setattr(sm, "SITES_FILE", p)
+        monkeypatch.setattr(sys, "argv", ["astro_alert", "--dry-run"])
+
+        reports = [make_nogo_report("Home"), make_nogo_report("Dark Site", 70)]
+        it = iter(reports)
+        with patch("astro_alert._fetch_report", side_effect=lambda s, d: next(it)):
+            astro_alert.main()
+
+        out = capsys.readouterr().out
+        assert "dry-run" in out
