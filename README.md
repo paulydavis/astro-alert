@@ -307,7 +307,7 @@ astro_alert/
 ├── seeing.py            # 7timer.info seeing/transparency fetch
 ├── moon.py              # Moon phase and rise/set via ephem
 ├── scorer.py            # Bortle-aware 0–100 scoring
-├── gmail_notifier.py    # Gmail SMTP email sender
+├── smtp_notifier.py     # Provider-neutral SMTP email sender
 ├── notifier.py          # Alert dispatch
 ├── sites.json           # Site database (your locations)
 ├── sites.example.json   # Starter template
