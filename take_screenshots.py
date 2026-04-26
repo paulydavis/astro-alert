@@ -27,13 +27,24 @@ def screencap(filename: str, app: tk.Tk):
     print(f"  saved {path}")
 
 
+def screencap_window(filename: str, win: tk.Toplevel):
+    win.update_idletasks()
+    x = win.winfo_rootx()
+    y = win.winfo_rooty()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    path = str(OUT / filename)
+    subprocess.run(["screencapture", "-x", "-R", f"{x},{y},{w},{h}", path])
+    print(f"  saved {path}")
+
+
 def run():
     app = gui.AstroAlertApp()
     app.lift()
     app.focus_force()
 
     def step1():
-        # Dashboard — run a dry-run first so there's output
+        # Dashboard — run a dry-run so there's output to show
         app._night_var.set("tonight")
         app._dry_run_var.set(True)
         app._start_forecast()
@@ -41,7 +52,7 @@ def run():
 
     def _wait_for_forecast(callback, max_ms=30000, interval=500):
         if str(app._run_btn.cget("state")) != "disabled":
-            app.after(300, callback)  # small extra pause so output renders
+            app.after(300, callback)
         elif max_ms <= 0:
             app.after(0, callback)
         else:
@@ -49,33 +60,27 @@ def run():
 
     def step2():
         screencap("dashboard.png", app)
-        # Switch to Sites tab
-        app._nb.select(1)
+        app._nb.select(1)           # Sites tab
         app.after(500, step3)
 
     def step3():
         screencap("sites.png", app)
-        # Switch to Schedule tab
-        app._nb.select(2)
+        app._nb.select(2)           # Schedule tab
         app.after(600, step4)
 
     def step4():
         screencap("schedule.png", app)
+        app._nb.select(3)           # Settings tab
+        app.after(600, step5)
+
+    def step5():
+        screencap("settings.png", app)
         # Open Add Site dialog
         dlg = gui.SiteDialog(app, title="Add Site")
-        app.after(400, lambda: step5(dlg))
+        app.after(400, lambda: step6(dlg))
 
-    def step5(dlg):
-        screencap("add_site.png", app)  # capture main window with dialog on top
-        # Also capture just the dialog
-        dlg.update_idletasks()
-        x = dlg.winfo_rootx()
-        y = dlg.winfo_rooty()
-        w = dlg.winfo_width()
-        h = dlg.winfo_height()
-        path = str(OUT / "add_site_dialog.png")
-        subprocess.run(["screencapture", "-x", "-R", f"{x},{y},{w},{h}", path])
-        print(f"  saved {path}")
+    def step6(dlg):
+        screencap_window("add_site_dialog.png", dlg)
         dlg.destroy()
         app.after(300, app.destroy)
 

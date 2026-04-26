@@ -32,6 +32,8 @@ python3 gui.py
 
 **Settings** — enter your Gmail address and App Password. Also set your **Home Location** (address search with autocomplete) — this becomes the starting point for automatic drive-time calculations. Credentials and home location are saved to your OS user data directory (never next to the source files).
 
+![Settings](screenshots/settings.png)
+
 ## Packaged app (no Python required)
 
 You can build a self-contained app from source with one command. The result runs on any machine of the same OS — no Python installation needed.
