@@ -38,6 +38,31 @@ BTN_ACT   = "#30363d"
 STATUS_BG = "#010409"
 
 
+# ── Routing helpers ────────────────────────────────────────────────────────────
+
+def _get_home_location():
+    """Return (lat, lon) from the saved home location, or None if not set."""
+    from data_dir import ENV_FILE
+    from dotenv import dotenv_values
+    vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
+    try:
+        return float(vals["HOME_LAT"]), float(vals["HOME_LON"])
+    except (KeyError, ValueError):
+        return None
+
+
+def _osrm_drive_minutes(home_lat: float, home_lon: float,
+                         site_lat: float, site_lon: float) -> int:
+    """Return driving minutes between two points via the public OSRM API."""
+    import requests
+    url = (f"https://router.project-osrm.org/route/v1/driving/"
+           f"{home_lon},{home_lat};{site_lon},{site_lat}?overview=false")
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()
+    seconds = resp.json()["routes"][0]["duration"]
+    return round(seconds / 60)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main application window
 # ─────────────────────────────────────────────────────────────────────────────
@@ -570,6 +595,54 @@ class AstroAlertApp(tk.Tk):
                                      command=self._send_test_email)
         self._test_btn.pack(side="left")
 
+        # ── Home Location ──────────────────────────────────────────────────────
+        ttk.Separator(inner).pack(fill="x", pady=(24, 0))
+        ttk.Label(inner, text="Home Location",
+                  font=(FONT_PROP, 15, "bold")).pack(pady=(16, 4))
+        ttk.Label(inner, text="Your starting point for drive-time calculations.",
+                  style="Sub.TLabel").pack(pady=(0, 16))
+
+        home_card = ttk.Frame(inner, style="Card.TFrame")
+        home_card.pack(fill="x", ipadx=28, ipady=16)
+        home_card.columnconfigure(1, weight=1)
+
+        self._home_geo_results: list[dict] = []
+        self._home_search_var = tk.StringVar()
+        self._home_lat_var    = tk.StringVar()
+        self._home_lon_var    = tk.StringVar()
+
+        ttk.Label(home_card, text="Search:", style="CardDim.TLabel").grid(
+            row=0, column=0, sticky="w", pady=8, padx=(16, 12))
+        home_entry = ttk.Entry(home_card, textvariable=self._home_search_var,
+                               font=(FONT_PROP, 12))
+        home_entry.grid(row=0, column=1, sticky="ew", pady=8)
+        home_entry.bind("<Return>", lambda _e: self._search_home_location())
+        self._home_search_btn = ttk.Button(home_card, text="Search", width=8,
+                                            command=self._search_home_location)
+        self._home_search_btn.grid(row=0, column=2, padx=(8, 16), pady=8)
+
+        self._home_results_var   = tk.StringVar()
+        self._home_results_combo = ttk.Combobox(home_card,
+                                                 textvariable=self._home_results_var,
+                                                 state="disabled",
+                                                 font=(FONT_PROP, 11))
+        self._home_results_combo.grid(row=1, column=0, columnspan=3,
+                                       sticky="ew", padx=16, pady=(0, 8))
+        self._home_results_combo.bind("<<ComboboxSelected>>",
+                                       self._on_home_result_selected)
+
+        for row_idx, (label, var) in enumerate([("Latitude",  self._home_lat_var),
+                                                 ("Longitude", self._home_lon_var)], start=2):
+            ttk.Label(home_card, text=label + ":", style="CardDim.TLabel").grid(
+                row=row_idx, column=0, sticky="w", pady=6, padx=(16, 12))
+            ttk.Entry(home_card, textvariable=var, font=(FONT_PROP, 12),
+                      width=18).grid(row=row_idx, column=1, sticky="w", pady=6)
+
+        home_btn_row = ttk.Frame(inner)
+        home_btn_row.pack(pady=(14, 0))
+        ttk.Button(home_btn_row, text="Save Home Location", style="Accent.TButton",
+                   command=self._save_home_location).pack()
+
         self.after(50, self._load_credentials_to_form)
 
     def _load_credentials_to_form(self):
@@ -579,25 +652,96 @@ class AstroAlertApp(tk.Tk):
         self._cred_user_var.set(vals.get("GMAIL_USER", ""))
         self._cred_pass_var.set(vals.get("GMAIL_APP_PASSWORD", ""))
         self._cred_to_var.set(vals.get("ALERT_EMAIL_TO", ""))
+        self._home_lat_var.set(vals.get("HOME_LAT", ""))
+        self._home_lon_var.set(vals.get("HOME_LON", ""))
 
     def _save_credentials(self):
         import unicodedata
         from data_dir import ENV_FILE
+        from dotenv import set_key, unset_key
         def _norm(s): return unicodedata.normalize("NFKC", s).strip()
         gmail_user = _norm(self._cred_user_var.get())
         gmail_pass = _norm(self._cred_pass_var.get())
         alert_to   = _norm(self._cred_to_var.get())
-        lines = []
+        ENV_FILE.touch()
         if gmail_user:
-            lines.append(f"GMAIL_USER={gmail_user}")
+            set_key(ENV_FILE, "GMAIL_USER", gmail_user)
         if gmail_pass:
-            lines.append(f"GMAIL_APP_PASSWORD={gmail_pass}")
+            set_key(ENV_FILE, "GMAIL_APP_PASSWORD", gmail_pass)
         if alert_to:
-            lines.append(f"ALERT_EMAIL_TO={alert_to}")
-        ENV_FILE.write_text("\n".join(lines) + "\n")
+            set_key(ENV_FILE, "ALERT_EMAIL_TO", alert_to)
+        else:
+            unset_key(ENV_FILE, "ALERT_EMAIL_TO")
         self._refresh_cred_banner()
         self._set_status("Credentials saved.")
         messagebox.showinfo("Saved", "Credentials saved. Send a test email to verify.",
+                            parent=self)
+
+    def _search_home_location(self):
+        query = self._home_search_var.get().strip()
+        if not query:
+            return
+        self._home_search_btn.configure(state="disabled", text="…")
+        threading.Thread(target=self._do_geocode_home, args=(query,),
+                         daemon=True).start()
+
+    def _do_geocode_home(self, query: str):
+        import requests
+        try:
+            resp = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": query, "format": "json", "limit": 5},
+                headers={"User-Agent": "AstroAlert/1.0 paulydavis@gmail.com"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            self.after(0, self._geocode_home_done, resp.json())
+        except Exception as e:
+            self.after(0, self._geocode_home_error, str(e))
+
+    def _geocode_home_done(self, results: list[dict]):
+        self._home_search_btn.configure(state="normal", text="Search")
+        if not results:
+            messagebox.showinfo("No results", "No locations found.", parent=self)
+            return
+        self._home_geo_results = results
+        self._home_results_combo.configure(
+            values=[r["display_name"] for r in results],
+            state="readonly",
+        )
+        self._home_results_combo.current(0)
+        self._on_home_result_selected()
+
+    def _geocode_home_error(self, msg: str):
+        self._home_search_btn.configure(state="normal", text="Search")
+        messagebox.showerror("Search failed", f"Could not reach geocoding service:\n{msg}",
+                             parent=self)
+
+    def _on_home_result_selected(self, _event=None):
+        idx = self._home_results_combo.current()
+        if idx < 0 or idx >= len(self._home_geo_results):
+            return
+        r = self._home_geo_results[idx]
+        self._home_lat_var.set(f"{float(r['lat']):.5f}")
+        self._home_lon_var.set(f"{float(r['lon']):.5f}")
+
+    def _save_home_location(self):
+        from data_dir import ENV_FILE
+        from dotenv import set_key
+        try:
+            lat = float(self._home_lat_var.get().strip())
+            lon = float(self._home_lon_var.get().strip())
+        except ValueError:
+            messagebox.showerror("Invalid", "Enter valid latitude and longitude.",
+                                 parent=self)
+            return
+        ENV_FILE.touch()
+        set_key(ENV_FILE, "HOME_LAT", str(lat))
+        set_key(ENV_FILE, "HOME_LON", str(lon))
+        self._set_status("Home location saved.")
+        messagebox.showinfo("Saved",
+                            f"Home set to {lat:.4f}, {lon:.4f}.\n"
+                            "Drive times will now calculate automatically when adding sites.",
                             parent=self)
 
     def _toggle_password(self):
@@ -741,6 +885,11 @@ class SiteDialog(tk.Toplevel):
                       state=state).grid(row=row_idx, column=1, sticky="ew", pady=5)
             self._vars[field] = var
 
+            if field == "drive_min":
+                self._calc_btn = ttk.Button(grid, text="Calculate ↗", width=12,
+                                             command=self._calculate_drive_time)
+                self._calc_btn.grid(row=row_idx, column=2, padx=(8, 0), pady=5)
+
             if field == "bortle":
                 ttk.Button(grid, text="Map ↗", width=6,
                            command=self._open_bortle_map).grid(
@@ -837,6 +986,43 @@ class SiteDialog(tk.Toplevel):
             self.after(0, self._vars["elevation_m"].set, f"{elev:.0f}")
         except Exception:
             pass  # user can fill it manually
+
+    def _calculate_drive_time(self):
+        try:
+            site_lat = float(self._vars["lat"].get())
+            site_lon = float(self._vars["lon"].get())
+        except ValueError:
+            messagebox.showwarning("Missing coordinates",
+                                   "Fill in latitude and longitude first.",
+                                   parent=self)
+            return
+        home = _get_home_location()
+        if home is None:
+            messagebox.showwarning("Home not set",
+                                   "Set your home location in Settings first.",
+                                   parent=self)
+            return
+        self._calc_btn.configure(state="disabled", text="…")
+        home_lat, home_lon = home
+        threading.Thread(target=self._do_calculate_drive_time,
+                         args=(home_lat, home_lon, site_lat, site_lon),
+                         daemon=True).start()
+
+    def _do_calculate_drive_time(self, home_lat, home_lon, site_lat, site_lon):
+        try:
+            minutes = _osrm_drive_minutes(home_lat, home_lon, site_lat, site_lon)
+            self.after(0, self._drive_time_done, minutes, None)
+        except Exception as e:
+            self.after(0, self._drive_time_done, None, str(e))
+
+    def _drive_time_done(self, minutes, error):
+        self._calc_btn.configure(state="normal", text="Calculate ↗")
+        if error:
+            messagebox.showerror("Routing failed",
+                                 f"Could not calculate drive time:\n{error}",
+                                 parent=self)
+            return
+        self._vars["drive_min"].set(str(minutes))
 
     def _open_bortle_map(self):
         try:

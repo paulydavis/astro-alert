@@ -820,9 +820,10 @@ class TestSettingsTab:
         app._cred_pass_var.set("mypassword")
         with patch("tkinter.messagebox.showinfo"):
             app._save_credentials()
-        content = fake_env.read_text()
-        assert "GMAIL_USER=me@gmail.com" in content
-        assert "GMAIL_APP_PASSWORD=mypassword" in content
+        from dotenv import dotenv_values
+        vals = dotenv_values(fake_env)
+        assert vals["GMAIL_USER"] == "me@gmail.com"
+        assert vals["GMAIL_APP_PASSWORD"] == "mypassword"
 
     def test_save_credentials_omits_empty_fields(self, app, tmp_path, monkeypatch):
         fake_env = tmp_path / ".env"
