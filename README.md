@@ -157,6 +157,37 @@ Gmail is the default. To use another provider, set `SMTP_HOST` and `SMTP_PORT` (
 | Yahoo Mail | smtp.mail.yahoo.com | 587 |
 | iCloud Mail | smtp.mail.me.com | 587 |
 
+All providers use port 587 with STARTTLS. Every provider requires an **App Password** (a separate password just for apps) — your normal login password won't work. See below for how to create one for each provider.
+
+**Testing a non-Gmail provider:** in the Settings tab, tick "Use a different email provider (custom SMTP)", enter your host/port, save, then click **Send Test Email**.
+
+#### Outlook / Hotmail users: create an App Password
+
+**Prerequisites:** 2-Step Verification must be enabled. If it isn't, [enable it first](https://account.microsoft.com/security).
+
+1. Go to [account.microsoft.com/security](https://account.microsoft.com/security) and sign in
+2. Under **Advanced security options**, find **App passwords**
+3. Click **Create a new app password**
+4. Copy the generated password and paste it into the **App password** field in Settings
+
+#### Yahoo Mail users: create an App Password
+
+**Prerequisites:** 2-Step Verification must be enabled on your Yahoo account.
+
+1. Go to [account.yahoo.com/security](https://account.yahoo.com/security) and sign in
+2. Scroll to **App passwords** and click **Generate app password**
+3. Select or type `Astro Alert` as the app name and click **Generate**
+4. Copy the password and paste it into the **App password** field in Settings
+
+#### iCloud Mail users: create an App Password
+
+**Prerequisites:** Two-Factor Authentication must be enabled on your Apple ID.
+
+1. Go to [appleid.apple.com](https://appleid.apple.com) and sign in
+2. Under **Sign-In and Security**, click **App-Specific Passwords**
+3. Click **+** to generate a new password, name it `Astro Alert`
+4. Copy the password and paste it into the **App password** field in Settings
+
 When running from a packaged app, credentials are saved to your OS user data directory instead:
 
 | OS | Path |
