@@ -16,6 +16,7 @@ a = Analysis(
     pathex=[str(Path('.').resolve())],
     binaries=[],
     datas=[
+        ('sites.json', '.'),
         ('sites.example.json', '.'),
     ],
     hiddenimports=[
