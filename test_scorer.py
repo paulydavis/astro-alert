@@ -1,10 +1,10 @@
 """Tests for scorer.py."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import pytest
 
 from moon import MoonInfo
-from scorer import score_night, _weather_score, _seeing_score, _moon_score, _dark_hours_after_moonset
+from scorer import score_night, _weather_score, _seeing_score, _moon_score, _dark_hours_after_moonset, _imaging_hours
 from seeing import SeeingResult, SeeingHour
 from weather import WeatherResult, HourlyWeather
 
@@ -255,3 +255,94 @@ class TestScoreNight:
         )
         # Should be evaluated on score, not hard-blocked
         assert "bright moon" not in score.summary.lower()
+
+    def test_summary_excellent(self):
+        score = score_night(
+            make_weather(cloud=5, wind=3),
+            make_seeing(8, 8),
+            make_moon(phase=2),
+            bortle=7,
+        )
+        assert score.go
+        assert "excellent" in score.summary.lower()
+
+    def test_summary_good(self):
+        # Need total 65–79: clear sky (40) + mid seeing (15+10=25) + new moon (30) = 95 — too high.
+        # Use partly cloudy (18) + mid seeing (22) + new moon (30) = 70
+        score = score_night(
+            make_weather(cloud=30),
+            make_seeing(6, 6),
+            make_moon(phase=2),
+            bortle=7,
+        )
+        assert score.go
+        assert "good" in score.summary.lower()
+
+    def test_summary_marginal(self):
+        # cloud=20 → 32pts, seeing(3,3) → 10pts, quarter moon(40%) → 15pts = 57 (marginal 55–64)
+        score = score_night(
+            make_weather(cloud=20),
+            make_seeing(3, 3),
+            make_moon(phase=40),
+            bortle=7,
+        )
+        assert score.go
+        assert "marginal" in score.summary.lower()
+
+    def test_target_date_filters_hours(self):
+        # Hours outside the imaging window for target_date should be ignored
+        target = date(2024, 1, 1)
+        # Hour 21 on target_date IS in window; hour 10 is NOT
+        h_in = HourlyWeather(
+            time=datetime(2024, 1, 1, 21, 0, tzinfo=timezone.utc),
+            cloud_cover_pct=0, precip_mm=0, wind_speed_kmh=5,
+            humidity_pct=50, dew_point_c=5, temp_c=15,
+        )
+        h_out = HourlyWeather(
+            time=datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc),
+            cloud_cover_pct=100, precip_mm=5, wind_speed_kmh=50,
+            humidity_pct=99, dew_point_c=14, temp_c=15,
+        )
+        result = WeatherResult(
+            site_key="test",
+            fetched_at=datetime.now(timezone.utc),
+            hours=[h_in, h_out],
+        )
+        pts_with_date, _ = _weather_score(result, bortle=7, target_date=target)
+        pts_no_date, _ = _weather_score(result, bortle=7, target_date=None)
+        # With date filtering only the clear hour counts — score should be higher
+        assert pts_with_date > pts_no_date
+
+    def test_moderate_wind_penalty(self):
+        pts_calm, _ = _weather_score(make_weather(wind=5), bortle=7)
+        pts_moderate, warns = _weather_score(make_weather(wind=25), bortle=7)
+        assert pts_moderate < pts_calm
+        assert any("moderate wind" in w.lower() for w in warns)
+
+    def test_high_humidity_warning(self):
+        _, warns = _weather_score(make_weather(humidity=95, dew_gap=5), bortle=7)
+        assert any("humidity" in w.lower() for w in warns)
+
+
+# --- _imaging_hours ----------------------------------------------------------
+
+class TestImagingHours:
+    def test_returns_nine_hours(self):
+        # 20,21,22,23 + 00,01,02,03,04 = 9 hours
+        hours = _imaging_hours(date(2024, 6, 15))
+        assert len(hours) == 9
+
+    def test_evening_hours_on_target_date(self):
+        target = date(2024, 6, 15)
+        hours = _imaging_hours(target)
+        assert datetime(2024, 6, 15, 21, tzinfo=timezone.utc) in hours
+
+    def test_early_morning_on_next_date(self):
+        target = date(2024, 6, 15)
+        hours = _imaging_hours(target)
+        assert datetime(2024, 6, 16, 2, tzinfo=timezone.utc) in hours
+
+    def test_midday_not_in_window(self):
+        target = date(2024, 6, 15)
+        hours = _imaging_hours(target)
+        assert datetime(2024, 6, 15, 12, tzinfo=timezone.utc) not in hours
