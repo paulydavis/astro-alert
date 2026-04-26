@@ -118,7 +118,17 @@ These are the author's sites near Durham, NC. See [Setup](#setup) to replace the
 ```bash
 git clone https://github.com/paulydavis/astro-alert.git
 cd astro-alert
-pip install requests ephem python-dotenv
+pip install -r requirements.txt
+```
+
+**Python 3.11 or newer is required.** tkinter must be available — it ships with the standard macOS and Windows installers. On Linux install it with your package manager if needed:
+
+```bash
+# Debian/Ubuntu
+sudo apt install python3-tk
+
+# Fedora/RHEL
+sudo dnf install python3-tkinter
 ```
 
 ### 2. Configure credentials
