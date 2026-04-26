@@ -4,11 +4,7 @@ Go/no-go email alert system for astrophotography sessions. Fetches weather, atmo
 
 ## GUI
 
-A graphical control panel is included — run it with:
-
-```bash
-python3 gui.py
-```
+Astro Alert has a graphical control panel with four tabs:
 
 **Dashboard** — run a dry-run or live forecast for any site, with colour-coded GO/NO-GO output.
 
@@ -28,11 +24,13 @@ python3 gui.py
 
 ![Settings](screenshots/settings.png)
 
-## Packaged app (no Python required)
+## Installation (no Python required)
 
-You can build a self-contained app from source with one command. The result runs on any machine of the same OS — no Python installation needed.
+Download the latest release for your platform from the [Releases page](https://github.com/paulydavis/astro-alert/releases), or build it yourself from source (see below). No Python installation needed.
 
-### macOS → `AstroAlert.app`
+### Building from source
+
+#### macOS → `AstroAlert.app`
 
 ```bash
 bash build.sh
@@ -42,7 +40,7 @@ cp -r dist/AstroAlert.app /Applications/
 
 Double-click **AstroAlert** in your Applications folder. On first launch macOS Gatekeeper will block it because it isn't signed. Right-click the app → **Open** → **Open** to allow it once. After that it opens normally.
 
-### Windows → `AstroAlert.exe`
+#### Windows → `AstroAlert.exe`
 
 Double-click **`build.bat`** (or run it from a command prompt that has Python on its PATH).
 
@@ -52,7 +50,7 @@ Output: dist\AstroAlert.exe
 
 Copy `AstroAlert.exe` anywhere you like and double-click it. Windows SmartScreen will warn about an unsigned app — click **More info** → **Run anyway** to proceed.
 
-### Linux → `AstroAlert` binary
+#### Linux → `AstroAlert` binary
 
 ```bash
 bash build.sh
@@ -67,7 +65,7 @@ To add it to your application menu, copy the binary to a permanent location and 
 cp AstroAlert.desktop ~/.local/share/applications/
 ```
 
-### Code signing (optional — removes OS warnings)
+#### Code signing (optional — removes OS warnings)
 
 Both Gatekeeper and SmartScreen warnings go away when the app is signed by a trusted certificate authority.
 
