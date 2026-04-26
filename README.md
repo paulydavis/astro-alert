@@ -22,6 +22,8 @@ Each site is scored 0–100:
 
 **GO threshold: 55/100.** Scoring is Bortle-aware — cloud cover is weighted more heavily at dark sites (Bortle ≤ 4) where sky quality is the whole point of the drive.
 
+**Moon hard cutoff:** if the moon is ≥ 75% illuminated and still up at midnight, the night is automatically NO-GO regardless of score. If the moon is ≥ 75% but sets before midnight, the score reflects the usable dark hours after moonset (up to 12/30) and the email notes what time to start imaging.
+
 ## Sites
 
 | Key | Name | Bortle | Drive |
