@@ -1,12 +1,6 @@
 # Astro Alert
 
-Go/no-go email alert system for astrophotography sessions. Fetches weather, atmospheric seeing, and moon data for multiple sites near Durham, NC and sends a nightly summary to your inbox.
-
-## Hardware
-
-- **Camera:** ZWO ASI2600MC-Air (one-shot color)
-- **Refractor:** Askar 120 APO + 0.8× reducer — 672mm f/5.6 (~2.0° × 1.34° FOV)
-- **Mount:** ZWO AM5N
+Go/no-go email alert system for astrophotography sessions. Fetches weather, atmospheric seeing, and moon data for your dark-sky sites, scores each one 0–100, and sends a nightly summary to your inbox — so you know whether it's worth heading out before it gets dark.
 
 ## GUI
 
