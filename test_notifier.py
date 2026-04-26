@@ -7,7 +7,8 @@ import pytest
 
 from datetime import datetime, timezone
 from moon import MoonInfo
-from gmail_notifier import SiteReport, send_multi_site_alert, _format_report
+from gmail_notifier import (SiteReport, send_multi_site_alert, send_test_email,
+                             _format_report, _clean, _validate_address)
 from scorer import Score
 
 ENV = {
@@ -190,3 +191,133 @@ class TestSendMultiSiteAlert:
 
         assert not result.sent
         assert result.error is not None
+
+
+# --- _clean ------------------------------------------------------------------
+
+class TestClean:
+    def test_strips_regular_whitespace(self):
+        assert _clean("  hello  ") == "hello"
+
+    def test_strips_non_breaking_space(self):
+        assert _clean("\xa0user@gmail.com\xa0") == "user@gmail.com"
+
+    def test_returns_empty_for_none(self):
+        assert _clean(None) == ""
+
+    def test_returns_empty_for_empty_string(self):
+        assert _clean("") == ""
+
+    def test_nfkc_normalizes_fullwidth_chars(self):
+        # Fullwidth digits/letters normalize to ASCII equivalents
+        assert _clean("ａｂｃ") == "abc"
+
+
+# --- _validate_address -------------------------------------------------------
+
+class TestValidateAddress:
+    def test_valid_address_returns_none(self):
+        assert _validate_address("user@gmail.com") is None
+
+    def test_empty_address_returns_error(self):
+        assert _validate_address("") is not None
+
+    def test_missing_at_returns_error(self):
+        err = _validate_address("usergmail.com")
+        assert err is not None
+        assert "@" in err
+
+    def test_empty_local_part_returns_error(self):
+        err = _validate_address("@gmail.com")
+        assert err is not None
+
+    def test_double_dot_in_domain_returns_error(self):
+        err = _validate_address("user@gmail..com")
+        assert err is not None
+        assert "invalid domain" in err
+
+    def test_domain_missing_dot_returns_error(self):
+        err = _validate_address("user@localhost")
+        assert err is not None
+
+    def test_domain_leading_dot_returns_error(self):
+        err = _validate_address("user@.gmail.com")
+        assert err is not None
+
+    def test_domain_trailing_dot_returns_error(self):
+        err = _validate_address("user@gmail.com.")
+        assert err is not None
+
+    def test_invalid_address_caught_by_send_multi_site_alert(self):
+        env = {**ENV, "GMAIL_USER": "user@gmail..com"}
+        with patch.dict("os.environ", env):
+            result = send_multi_site_alert([make_report()])
+        assert not result.sent
+        assert "Invalid address" in result.error
+
+
+# --- send_test_email ---------------------------------------------------------
+
+class TestSendTestEmail:
+    def _make_smtp(self):
+        mock = MagicMock()
+        mock.__enter__ = MagicMock(return_value=mock)
+        mock.__exit__ = MagicMock(return_value=False)
+        return mock
+
+    def test_sends_successfully(self):
+        mock_smtp = self._make_smtp()
+        with patch.dict("os.environ", ENV):
+            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+                result = send_test_email()
+        assert result.sent
+        assert result.error is None
+
+    def test_returns_error_when_credentials_missing(self):
+        with patch.dict("os.environ", {}, clear=True):
+            result = send_test_email()
+        assert not result.sent
+        assert "not configured" in result.error.lower()
+
+    def test_returns_error_on_invalid_gmail_user(self):
+        env = {**ENV, "GMAIL_USER": "notanemail"}
+        with patch.dict("os.environ", env):
+            result = send_test_email()
+        assert not result.sent
+        assert "Invalid address" in result.error
+
+    def test_returns_error_on_double_dot_recipient(self):
+        env = {**ENV, "ALERT_EMAIL_TO": "user@gmail..com"}
+        with patch.dict("os.environ", env):
+            result = send_test_email()
+        assert not result.sent
+        assert "Invalid address" in result.error
+
+    def test_returns_error_on_auth_failure(self):
+        import smtplib
+        mock_smtp = self._make_smtp()
+        mock_smtp.login.side_effect = smtplib.SMTPAuthenticationError(535, b"Bad creds")
+        with patch.dict("os.environ", ENV):
+            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+                result = send_test_email()
+        assert not result.sent
+        assert "auth" in result.error.lower()
+
+    def test_never_raises(self):
+        mock_smtp = self._make_smtp()
+        mock_smtp.send_message.side_effect = RuntimeError("timeout")
+        with patch.dict("os.environ", ENV):
+            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+                result = send_test_email()
+        assert not result.sent
+        assert result.error is not None
+
+    def test_uses_gmail_user_as_recipient_when_alert_to_not_set(self):
+        env = {"GMAIL_USER": "me@gmail.com", "GMAIL_APP_PASSWORD": "pw"}
+        calls = []
+        mock_smtp = self._make_smtp()
+        mock_smtp.send_message = lambda msg, **kw: calls.append(kw)
+        with patch.dict("os.environ", env, clear=True):
+            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+                send_test_email()
+        assert calls[0]["to_addrs"] == ["me@gmail.com"]
