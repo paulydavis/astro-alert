@@ -547,8 +547,22 @@ class AstroAlertApp(tk.Tk):
     # ── Settings tab ────────────────────────────────────────────────────────────
 
     def _build_settings_tab(self, parent):
-        inner = ttk.Frame(parent)
-        inner.pack(expand=True)
+        canvas = tk.Canvas(parent, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        inner = ttk.Frame(canvas)
+        _win = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(_win, width=e.width))
+
+        def _on_mousewheel(e):
+            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
         ttk.Label(inner, text="Email Credentials",
                   font=(FONT_PROP, 17, "bold")).pack(pady=(0, 5))
