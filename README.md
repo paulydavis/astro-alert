@@ -196,7 +196,7 @@ Find your Bortle class at [lightpollutionmap.info](https://www.lightpollutionmap
 
 ### 4. Set up automatic daily emails
 
-A cron job (macOS/Linux) or Scheduled Task (Windows) is a background timer built into your OS — it runs a program at a set time each day without you having to do anything. Astro Alert uses two of these to send your forecast emails automatically.
+A **cron job** (macOS/Linux) or **Scheduled Task** (Windows) is like a built-in alarm clock for your computer — except instead of waking you up, it quietly runs a program in the background at a set time every day, without you opening anything or remembering to do it. Once it's set up, it just works. Astro Alert uses two of these — one at 6pm for tomorrow's forecast, one at 2pm for a same-day nudge — so your inbox gets the forecast automatically.
 
 **Option A — GUI (easiest):** open the app, go to the **Schedule** tab, and click **Install Schedule**. Done.
 
