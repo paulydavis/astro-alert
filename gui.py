@@ -3,9 +3,11 @@
 
 import io
 import platform
+import re
 import sys
 import threading
 import tkinter as tk
+import webbrowser
 from tkinter import messagebox, ttk
 from pathlib import Path
 
@@ -524,72 +526,194 @@ class AstroAlertApp(tk.Tk):
 class SiteDialog(tk.Toplevel):
     # (field_key, label, type, required)
     _FIELDS = [
-        ("key",          "Key",              str,   True),
-        ("name",         "Name",             str,   True),
-        ("lat",          "Latitude",         float, True),
-        ("lon",          "Longitude",        float, True),
-        ("elevation_m",  "Elevation (m)",    float, True),
-        ("bortle",       "Bortle  (1 – 9)",  int,   True),
-        ("timezone",     "Timezone (IANA)",  str,   True),
-        ("drive_min",    "Drive (min)",      int,   False),
-        ("notes",        "Notes",            str,   False),
+        ("key",         "Key",             str,   True),
+        ("name",        "Name",            str,   True),
+        ("lat",         "Latitude",        float, True),
+        ("lon",         "Longitude",       float, True),
+        ("elevation_m", "Elevation (m)",   float, True),
+        ("bortle",      "Bortle  (1–9)",   int,   True),
+        ("timezone",    "Timezone (IANA)", str,   True),
+        ("drive_min",   "Drive (min)",     int,   False),
+        ("notes",       "Notes",           str,   False),
     ]
 
     def __init__(self, parent, title="Site", site=None, key=None):
         super().__init__(parent)
         self.title(title)
         self.configure(bg=BG)
-        self.geometry("500x570")
+        self.geometry("520x680")
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
-        self.result = None
-        self._editing_key = key   # None when adding, set when editing
+        self.result       = None
+        self._editing_key = key
+        self._geo_results: list[dict] = []
         self._build(site, key)
 
     def _build(self, site, key):
         ttk.Label(self, text=self.title(),
-                  font=(FONT_PROP, 15, "bold")).pack(pady=(22, 0))
-        ttk.Separator(self).pack(fill="x", padx=30, pady=14)
+                  font=(FONT_PROP, 15, "bold")).pack(pady=(20, 0))
+        ttk.Separator(self).pack(fill="x", padx=30, pady=12)
 
-        grid = ttk.Frame(self)
-        grid.pack(padx=36, fill="x")
-        grid.columnconfigure(1, weight=1)
+        # ── Location search ────────────────────────────────────────────────────
+        sf = ttk.Frame(self)
+        sf.pack(padx=36, fill="x")
+        sf.columnconfigure(0, weight=1)
 
+        ttk.Label(sf, text="Search location:", style="Dim.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+
+        self._search_var = tk.StringVar()
+        se = ttk.Entry(sf, textvariable=self._search_var, font=(FONT_PROP, 12))
+        se.grid(row=1, column=0, sticky="ew", padx=(0, 8))
+        se.bind("<Return>", lambda _e: self._search_location())
+
+        self._search_btn = ttk.Button(sf, text="Search", width=8,
+                                       command=self._search_location)
+        self._search_btn.grid(row=1, column=1)
+
+        self._results_var   = tk.StringVar(value="— search above to auto-fill fields —")
+        self._results_combo = ttk.Combobox(sf, textvariable=self._results_var,
+                                            state="disabled", font=(FONT_PROP, 11))
+        self._results_combo.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        self._results_combo.bind("<<ComboboxSelected>>", self._on_result_selected)
+
+        ttk.Separator(self).pack(fill="x", padx=30, pady=12)
+
+        # ── Fields grid ────────────────────────────────────────────────────────
         defaults = {
-            "key":         key            or "",
+            "key":         key or "",
             "name":        getattr(site, "name",        "") or "",
             "lat":         str(getattr(site, "lat",     "")) if site else "",
             "lon":         str(getattr(site, "lon",     "")) if site else "",
             "elevation_m": str(getattr(site, "elevation_m", "")) if site else "",
             "bortle":      str(getattr(site, "bortle",  "")) if site else "",
-            "timezone":    getattr(site, "timezone",    "America/New_York") or "America/New_York",
+            "timezone":    getattr(site, "timezone", "America/New_York") or "America/New_York",
             "drive_min":   str(site.drive_min) if (site and site.drive_min) else "",
-            "notes":       getattr(site, "notes", "")  or "",
+            "notes":       getattr(site, "notes", "") or "",
         }
+
+        grid = ttk.Frame(self)
+        grid.pack(padx=36, fill="x")
+        grid.columnconfigure(1, weight=1)
 
         self._vars: dict[str, tk.StringVar] = {}
         for row_idx, (field, label, _, _req) in enumerate(self._FIELDS):
             ttk.Label(grid, text=label + ":", style="Dim.TLabel").grid(
-                row=row_idx, column=0, sticky="w", pady=6, padx=(0, 8))
+                row=row_idx, column=0, sticky="w", pady=5, padx=(0, 8))
             var   = tk.StringVar(value=defaults[field])
             state = "disabled" if (field == "key" and key) else "normal"
             ttk.Entry(grid, textvariable=var, font=(FONT_PROP, 12),
-                      state=state).grid(row=row_idx, column=1, sticky="ew", pady=6)
+                      state=state).grid(row=row_idx, column=1, sticky="ew", pady=5)
             self._vars[field] = var
 
+            if field == "bortle":
+                ttk.Button(grid, text="Map ↗", width=6,
+                           command=self._open_bortle_map).grid(
+                    row=row_idx, column=2, padx=(8, 0), pady=5)
+
+        # ── Footer ─────────────────────────────────────────────────────────────
         self._set_active_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(self, text="Set as active site",
-                         variable=self._set_active_var).pack(pady=(12, 0))
+                         variable=self._set_active_var).pack(pady=(10, 0))
 
-        ttk.Separator(self).pack(fill="x", padx=30, pady=14)
+        ttk.Separator(self).pack(fill="x", padx=30, pady=12)
 
         btns = ttk.Frame(self)
-        btns.pack(pady=(0, 22))
-        ttk.Button(btns, text="Cancel",
-                   command=self.destroy).pack(side="left", padx=(0, 14))
+        btns.pack(pady=(0, 20))
+        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=(0, 14))
         ttk.Button(btns, text="Save", style="Accent.TButton",
                    command=self._save).pack(side="left")
+
+    # ── Geocoding ──────────────────────────────────────────────────────────────
+
+    def _search_location(self):
+        query = self._search_var.get().strip()
+        if not query:
+            return
+        self._search_btn.configure(state="disabled", text="…")
+        threading.Thread(target=self._do_geocode, args=(query,), daemon=True).start()
+
+    def _do_geocode(self, query: str):
+        import requests
+        try:
+            resp = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": query, "format": "json", "limit": 5},
+                headers={"User-Agent": "AstroAlert/1.0 paulydavis@gmail.com"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            self.after(0, self._geocode_done, resp.json())
+        except Exception as e:
+            self.after(0, self._geocode_error, str(e))
+
+    def _geocode_done(self, results: list[dict]):
+        self._search_btn.configure(state="normal", text="Search")
+        if not results:
+            messagebox.showinfo("No results",
+                                "No locations found — try a more specific name.",
+                                parent=self)
+            return
+        self._geo_results = results
+        self._results_combo.configure(
+            values=[r["display_name"] for r in results],
+            state="readonly",
+        )
+        self._results_combo.current(0)
+        self._on_result_selected()
+
+    def _geocode_error(self, msg: str):
+        self._search_btn.configure(state="normal", text="Search")
+        messagebox.showerror("Search failed",
+                             f"Could not reach geocoding service:\n{msg}",
+                             parent=self)
+
+    def _on_result_selected(self, _event=None):
+        idx = self._results_combo.current()
+        if idx < 0 or idx >= len(self._geo_results):
+            return
+        r   = self._geo_results[idx]
+        lat = float(r["lat"])
+        lon = float(r["lon"])
+
+        self._vars["lat"].set(f"{lat:.5f}")
+        self._vars["lon"].set(f"{lon:.5f}")
+
+        short_name = r["display_name"].split(",")[0].strip()
+        self._vars["name"].set(short_name)
+
+        if not self._editing_key:
+            auto_key = re.sub(r"[^a-z0-9]+", "_", short_name.lower()).strip("_")[:24]
+            self._vars["key"].set(auto_key)
+
+        threading.Thread(target=self._fetch_elevation,
+                         args=(lat, lon), daemon=True).start()
+
+    def _fetch_elevation(self, lat: float, lon: float):
+        import requests
+        try:
+            resp = requests.get(
+                "https://api.open-meteo.com/v1/elevation",
+                params={"latitude": lat, "longitude": lon},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            elev = resp.json()["elevation"][0]
+            self.after(0, self._vars["elevation_m"].set, f"{elev:.0f}")
+        except Exception:
+            pass  # user can fill it manually
+
+    def _open_bortle_map(self):
+        try:
+            lat = float(self._vars["lat"].get())
+            lon = float(self._vars["lon"].get())
+            url = f"https://www.lightpollutionmap.info/#zoom=10&lat={lat}&lon={lon}"
+        except ValueError:
+            url = "https://www.lightpollutionmap.info/"
+        webbrowser.open(url)
+
+    # ── Save ───────────────────────────────────────────────────────────────────
 
     def _save(self):
         try:
@@ -610,8 +734,6 @@ class SiteDialog(tk.Toplevel):
                 raise ValueError("Bortle must be between 1 and 9.")
 
             result["set_active"] = self._set_active_var.get()
-
-            # When editing, key field is disabled — restore the original key
             if self._editing_key:
                 result["key"] = self._editing_key
 
