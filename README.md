@@ -38,14 +38,16 @@ Each site is scored 0–100:
 | `staunton_river` | Staunton River State Park | 2 | 120 min |
 | `durham_home` | Durham Home | 7 | — |
 
-Site coordinates and metadata live in `sites.json`. Never hardcode coordinates — always read from that file.
+These are the author's sites near Durham, NC. See [Setup](#setup) to replace them with your own. Site coordinates and metadata live in `sites.json`; use `sites.example.json` as a starting template.
 
 ## Setup
 
-### 1. Install dependencies
+### 1. Clone and install dependencies
 
 ```bash
-pip install requests ephem twilio python-dotenv
+git clone https://github.com/paulydavis/astro-alert.git
+cd astro-alert
+pip install requests ephem python-dotenv
 ```
 
 ### 2. Configure credentials
@@ -64,17 +66,48 @@ ALERT_EMAIL_TO=you@gmail.com
 
 To create a Gmail App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) (requires 2-Step Verification).
 
-### 3. Install cron jobs
+### 3. Set up your sites
+
+The included `sites.json` is pre-loaded with dark sites near Durham, NC. To use your own locations, replace it with the template and add your sites:
 
 ```bash
-# 6pm daily — tomorrow night's forecast (always sends)
-0 18 * * * /path/to/python3 /Users/pauldavis/astro_alert/astro_alert.py --tomorrow
-
-# 2pm daily — tonight's conditions (only sends if a site is GO)
-0 14 * * * /path/to/python3 /Users/pauldavis/astro_alert/astro_alert.py --only-if-go
+cp sites.example.json sites.json
 ```
 
-Both jobs append to `astro_alert.log`.
+Then add your sites via the CLI:
+
+```bash
+# Add your backyard
+python3 astro_alert.py add-site home "My Backyard" 40.7128 -74.0060 10 7 America/New_York --set-active
+
+# Add a dark site
+python3 astro_alert.py add-site dark "Cherry Springs SP" 41.6629 -77.8236 670 2 America/New_York
+
+# Confirm your sites
+python3 astro_alert.py list-sites
+```
+
+Find your Bortle class at [lightpollutionmap.info](https://www.lightpollutionmap.info) and your IANA timezone at [en.wikipedia.org/wiki/List_of_tz_database_time_zones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+
+### 4. Install cron jobs
+
+```bash
+# Find your python path
+which python3
+
+# Edit your crontab
+crontab -e
+```
+
+Add these two lines (replace `/path/to/python3` and `/path/to/astro-alert`):
+
+```
+# 6pm daily — tomorrow night's forecast (always sends)
+0 18 * * * /path/to/python3 /path/to/astro-alert/astro_alert.py --tomorrow >> /path/to/astro-alert/astro_alert.log 2>&1
+
+# 2pm daily — tonight's conditions (only sends if a site is GO)
+0 14 * * * /path/to/python3 /path/to/astro-alert/astro_alert.py --only-if-go >> /path/to/astro-alert/astro_alert.log 2>&1
+```
 
 ## Usage
 

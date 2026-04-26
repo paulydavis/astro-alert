@@ -1,0 +1,25 @@
+{
+  "active_site": "home",
+  "sites": {
+    "home": {
+      "name": "My Backyard",
+      "lat": 0.0,
+      "lon": 0.0,
+      "elevation_m": 100,
+      "bortle": 7,
+      "timezone": "America/New_York",
+      "drive_min": null,
+      "notes": "Backyard/testing only"
+    },
+    "dark_site": {
+      "name": "My Dark Site",
+      "lat": 0.0,
+      "lon": 0.0,
+      "elevation_m": 200,
+      "bortle": 4,
+      "timezone": "America/New_York",
+      "drive_min": 60,
+      "notes": "My nearest dark site"
+    }
+  }
+}
