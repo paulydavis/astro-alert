@@ -106,16 +106,44 @@ python3 astro_alert.py add-site my_spot "My Dark Spot" 35.5 -79.2 150 3 America/
 ```
 Moon: 79% illuminated  rises 20:22Z  sets 08:17Z
 
-Bladen Lakes State Forest (120min drive)
-  GO — 57/100  [weather 22/40, seeing 17/30, moon 18/30]
+Jordan Lake SRA (36min drive)
+  NO-GO — 30/100  [weather 8/40, seeing 21/30, moon 1/30]
+  Partly cloudy (40% avg) · Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
+
+Eno River State Park (40min drive)
+  NO-GO — 29/100  [weather 8/40, seeing 20/30, moon 1/30]
+  Partly cloudy (39% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
+
+Little River Regional Park (48min drive)
+  NO-GO — 20/100  [weather 0/40, seeing 19/30, moon 1/30]
+  Mostly cloudy (53% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 Medoc Mountain State Park (70min drive)
-  NO-GO — 50/100  [weather 18/40, seeing 14/30, moon 18/30]
-  Partly cloudy (48% avg) · Poor transparency (2.1/8)
-...
+  NO-GO — 50/100  [weather 30/40, seeing 19/30, moon 1/30]
+  Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
+
+Uwharrie National Forest (105min drive)
+  NO-GO — 20/100  [weather 0/40, seeing 19/30, moon 1/30]
+  Mostly cloudy (61% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
+
+Bladen Lakes State Forest (120min drive)
+  GO — 57/100  [weather 22/40, seeing 34/30, moon 1/30]
+  Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
+
+James River State Park (120min drive)
+  NO-GO — 20/100  [weather 0/40, seeing 19/30, moon 1/30]
+  Mostly cloudy (73% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
+
+Staunton River State Park (120min drive)
+  NO-GO — 33/100  [weather 12/40, seeing 20/30, moon 1/30]
+  Partly cloudy (47% avg) · Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
+
+Durham Home (home)
+  NO-GO — 29/100  [weather 8/40, seeing 20/30, moon 1/30]
+  Partly cloudy (32% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
 ```
 
-Sites are listed in drive-time order (shortest first).
+Sites are listed in drive-time order (shortest first). The subject line calls out the best GO site, or the highest-scoring site if everything is NO-GO.
 
 ## Project structure
 
