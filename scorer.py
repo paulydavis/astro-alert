@@ -119,6 +119,22 @@ def _seeing_score(result: SeeingResult, target_date: Optional[date] = None) -> t
     return seeing_pts + transp_pts, warnings
 
 
+def _dark_hours_after_moonset(info: MoonInfo) -> float:
+    """Hours of dark imaging time (20:00–04:00 UTC) after the moon sets. 0 if up all night."""
+    if info.set_utc is None:
+        return 0.0
+    set_h = info.set_utc.hour + info.set_utc.minute / 60.0
+    if set_h < 12:
+        set_h += 24  # normalise 00–04 to 24–28
+    imaging_end = 28.0   # 04:00 next day
+    imaging_start = 20.0
+    if set_h >= imaging_end:
+        return 0.0
+    if set_h <= imaging_start:
+        return 8.0
+    return imaging_end - set_h
+
+
 def _moon_score(info: MoonInfo) -> tuple[int, list[str]]:
     """Score moon interference 0–30 (30 = no moon impact)."""
     warnings = []
@@ -136,10 +152,17 @@ def _moon_score(info: MoonInfo) -> tuple[int, list[str]]:
         pts = 6
         warnings.append(f"Gibbous moon ({phase:.0f}% illuminated)")
     else:
-        pts = 0
-        warnings.append(f"Bright moon ({phase:.0f}% illuminated)")
+        # Bright moon (≥75%): score by how many dark hours remain after moonset
+        dark_hrs = _dark_hours_after_moonset(info)
+        # Scale: 8 dark hours = 12 pts, 0 = 0 pts
+        pts = int((dark_hrs / 8.0) * 12)
+        if dark_hrs >= 4:
+            set_str = info.set_utc.strftime("%H:%MZ") if info.set_utc else "?"
+            warnings.append(f"Bright moon ({phase:.0f}%) sets {set_str} — image after moonset")
+        else:
+            warnings.append(f"Bright moon ({phase:.0f}% illuminated)")
 
-    if info.is_up_at_midnight and phase > 20:
+    if info.is_up_at_midnight and phase > 20 and phase < 75:
         pts = max(0, pts - 5)
         warnings.append("Moon up at midnight")
 
@@ -160,9 +183,14 @@ def score_night(
 
     total = w_pts + s_pts + m_pts
     all_warnings = w_warn + s_warn + m_warn
-    go = total >= go_threshold
+    # Hard cutoff: bright moon that's still up at midnight ruins the whole night
+    moon_kills_night = moon.phase_pct >= 75 and moon.is_up_at_midnight
 
-    if go:
+    if moon_kills_night:
+        go = False
+        summary = f"No-go — bright moon ({moon.phase_pct:.0f}%) up all night."
+    elif total >= go_threshold:
+        go = True
         if total >= 80:
             summary = "Excellent night — go image."
         elif total >= 65:
@@ -170,6 +198,7 @@ def score_night(
         else:
             summary = "Marginal but go-able — worth setting up."
     else:
+        go = False
         summary = "No-go tonight."
 
     return Score(
