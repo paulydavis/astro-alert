@@ -5,7 +5,7 @@ import argparse
 import sys
 from datetime import datetime, timedelta, timezone
 
-from gmail_notifier import SiteReport, send_multi_site_alert
+from smtp_notifier import SiteReport, send_multi_site_alert
 from moon import get_moon_info
 from scorer import score_night
 from seeing import fetch_seeing

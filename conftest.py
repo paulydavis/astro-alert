@@ -11,7 +11,7 @@ def isolate_env_file(tmp_path, monkeypatch):
     fake_env = tmp_path / ".env"
     monkeypatch.setattr("data_dir.ENV_FILE", fake_env)
     # Also patch it in modules that imported it at load time
-    import gmail_notifier
+    import smtp_notifier
     import scheduler_setup
-    monkeypatch.setattr(gmail_notifier, "__file__", gmail_notifier.__file__)
+    monkeypatch.setattr(smtp_notifier, "__file__", smtp_notifier.__file__)
     return fake_env

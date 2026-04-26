@@ -11,7 +11,7 @@ import astro_alert
 from astro_alert import build_parser, cmd_list_sites, cmd_add_site, cmd_run, _fetch_report
 from moon import MoonInfo
 from scorer import Score
-from gmail_notifier import SiteReport
+from smtp_notifier import SiteReport
 
 
 # ---------------------------------------------------------------------------
