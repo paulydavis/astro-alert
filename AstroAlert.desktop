@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Astro Alert
+Comment=Astrophotography go/no-go alert system
+Exec=/opt/AstroAlert/AstroAlert
+Icon=/opt/AstroAlert/AstroAlert
+Terminal=false
+Categories=Science;Astronomy;
+StartupNotify=true
