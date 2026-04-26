@@ -140,10 +140,22 @@ sudo dnf install python3-tkinter
 **Option B — manually:** copy `.env.example` to `.env` (in the same directory as the source) and fill in your details. Never commit `.env`.
 
 ```
-GMAIL_USER=you@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx   # Google App Password (not your login password)
-ALERT_EMAIL_TO=you@gmail.com             # optional — defaults to GMAIL_USER
+SMTP_USER=you@example.com
+SMTP_PASSWORD=xxxx xxxx xxxx xxxx   # App Password or provider equivalent (not your login password)
+ALERT_EMAIL_TO=you@example.com      # optional — defaults to SMTP_USER
+# Optional — only needed for non-Gmail providers:
+SMTP_HOST=smtp.gmail.com            # defaults to smtp.gmail.com
+SMTP_PORT=587                       # defaults to 587
 ```
+
+Gmail is the default. To use another provider, set `SMTP_HOST` and `SMTP_PORT` (or use the custom SMTP toggle in the Settings tab):
+
+| Provider | SMTP Host | Port |
+|----------|-----------|------|
+| Gmail | smtp.gmail.com | 587 |
+| Outlook / Hotmail | smtp-mail.outlook.com | 587 |
+| Yahoo Mail | smtp.mail.yahoo.com | 587 |
+| iCloud Mail | smtp.mail.me.com | 587 |
 
 When running from a packaged app, credentials are saved to your OS user data directory instead:
 
@@ -153,7 +165,7 @@ When running from a packaged app, credentials are saved to your OS user data dir
 | Windows | `%APPDATA%\AstroAlert\.env` |
 | Linux | `~/.config/AstroAlert/.env` |
 
-#### Creating a Gmail App Password
+#### Gmail users: create an App Password
 
 Astro Alert uses Gmail's SMTP service to send email. It needs an **App Password** — a 16-character code that works in place of your real password. Your normal Gmail password will not work here.
 
