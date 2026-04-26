@@ -121,7 +121,11 @@ cd astro-alert
 pip install -r requirements.txt
 ```
 
-**Python 3.11 or newer is required.** tkinter must be available — it ships with the standard macOS and Windows installers. On Linux install it with your package manager if needed:
+**Python 3.11 or newer is required.**
+
+- **Windows:** download from [python.org](https://www.python.org/downloads/) and check **"Add Python to PATH"** during install. tkinter is included. Use `python` instead of `python3` in all commands below.
+- **macOS:** tkinter is included with the python.org installer. If you use Homebrew Python, run `brew install python-tk` too.
+- **Linux:** install tkinter via your package manager if it isn't already present:
 
 ```bash
 # Debian/Ubuntu
