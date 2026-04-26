@@ -1,20 +1,19 @@
-"""Tests for gmail_notifier.py."""
+"""Tests for smtp_notifier.py."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from datetime import datetime, timezone
 from moon import MoonInfo
-from gmail_notifier import (SiteReport, send_multi_site_alert, send_test_email,
-                             _format_report, _clean, _validate_address)
+from smtp_notifier import (SiteReport, send_multi_site_alert, send_test_email,
+                            _format_report, _clean, _validate_address)
 from scorer import Score
 
 ENV = {
-    "GMAIL_USER": "test@gmail.com",
-    "GMAIL_APP_PASSWORD": "test-password",
-    "ALERT_EMAIL_TO": "test@gmail.com",
+    "SMTP_USER": "test@example.com",
+    "SMTP_PASSWORD": "test-password",
+    "ALERT_EMAIL_TO": "test@example.com",
 }
 
 
@@ -107,7 +106,7 @@ class TestSendMultiSiteAlert:
         mock_smtp = self._make_smtp()
         mock_smtp.send_message = lambda msg, **kw: sent_msg.update({"msg": msg})
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 send_multi_site_alert([report])
         body = sent_msg["msg"].get_content()
         assert "20:30" in body
@@ -116,7 +115,7 @@ class TestSendMultiSiteAlert:
     def test_sends_successfully(self):
         mock_smtp = self._make_smtp()
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 result = send_multi_site_alert([make_report()])
         assert result.sent
         assert result.error is None
@@ -129,7 +128,7 @@ class TestSendMultiSiteAlert:
         mock_smtp.send_message = capture
 
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 send_multi_site_alert([make_report(site_name="Staunton River", go=True)])
 
         assert "GO" in sent_msg["msg"]["Subject"]
@@ -145,7 +144,7 @@ class TestSendMultiSiteAlert:
             make_report(site_name="Medoc Mountain", go=False),
         ]
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 send_multi_site_alert(reports)
 
         assert "NO-GO" in sent_msg["msg"]["Subject"]
@@ -156,18 +155,18 @@ class TestSendMultiSiteAlert:
         mock_smtp.send_message = lambda msg, **kw: sent_msg.update({"msg": msg})
 
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 send_multi_site_alert([make_report()], night_label="tomorrow night")
 
         assert "tomorrow night" in sent_msg["msg"]["Subject"]
 
     def test_missing_env_var_returns_error(self):
-        incomplete = {k: v for k, v in ENV.items() if k != "GMAIL_APP_PASSWORD"}
+        incomplete = {k: v for k, v in ENV.items() if k != "SMTP_PASSWORD"}
         with patch.dict("os.environ", incomplete, clear=False):
-            import os; os.environ.pop("GMAIL_APP_PASSWORD", None)
+            import os; os.environ.pop("SMTP_PASSWORD", None)
             result = send_multi_site_alert([make_report()])
         assert not result.sent
-        assert "GMAIL_APP_PASSWORD" in result.error
+        assert "SMTP_PASSWORD" in result.error
 
     def test_auth_error_returns_error(self):
         import smtplib
@@ -175,7 +174,7 @@ class TestSendMultiSiteAlert:
         mock_smtp.login.side_effect = smtplib.SMTPAuthenticationError(535, b"Bad credentials")
 
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 result = send_multi_site_alert([make_report()])
 
         assert not result.sent
@@ -186,7 +185,7 @@ class TestSendMultiSiteAlert:
         mock_smtp.send_message.side_effect = RuntimeError("network down")
 
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 result = send_multi_site_alert([make_report()])
 
         assert not result.sent
@@ -249,7 +248,7 @@ class TestValidateAddress:
         assert err is not None
 
     def test_invalid_address_caught_by_send_multi_site_alert(self):
-        env = {**ENV, "GMAIL_USER": "user@gmail..com"}
+        env = {**ENV, "SMTP_USER": "user@gmail..com"}
         with patch.dict("os.environ", env):
             result = send_multi_site_alert([make_report()])
         assert not result.sent
@@ -268,7 +267,7 @@ class TestSendTestEmail:
     def test_sends_successfully(self):
         mock_smtp = self._make_smtp()
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 result = send_test_email()
         assert result.sent
         assert result.error is None
@@ -279,8 +278,8 @@ class TestSendTestEmail:
         assert not result.sent
         assert "not configured" in result.error.lower()
 
-    def test_returns_error_on_invalid_gmail_user(self):
-        env = {**ENV, "GMAIL_USER": "notanemail"}
+    def test_returns_error_on_invalid_smtp_user(self):
+        env = {**ENV, "SMTP_USER": "notanemail"}
         with patch.dict("os.environ", env):
             result = send_test_email()
         assert not result.sent
@@ -298,7 +297,7 @@ class TestSendTestEmail:
         mock_smtp = self._make_smtp()
         mock_smtp.login.side_effect = smtplib.SMTPAuthenticationError(535, b"Bad creds")
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 result = send_test_email()
         assert not result.sent
         assert "auth" in result.error.lower()
@@ -307,17 +306,17 @@ class TestSendTestEmail:
         mock_smtp = self._make_smtp()
         mock_smtp.send_message.side_effect = RuntimeError("timeout")
         with patch.dict("os.environ", ENV):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 result = send_test_email()
         assert not result.sent
         assert result.error is not None
 
-    def test_uses_gmail_user_as_recipient_when_alert_to_not_set(self):
-        env = {"GMAIL_USER": "me@gmail.com", "GMAIL_APP_PASSWORD": "pw"}
+    def test_uses_smtp_user_as_recipient_when_alert_to_not_set(self):
+        env = {"SMTP_USER": "me@example.com", "SMTP_PASSWORD": "pw"}
         calls = []
         mock_smtp = self._make_smtp()
         mock_smtp.send_message = lambda msg, **kw: calls.append(kw)
         with patch.dict("os.environ", env, clear=True):
-            with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
                 send_test_email()
-        assert calls[0]["to_addrs"] == ["me@gmail.com"]
+        assert calls[0]["to_addrs"] == ["me@example.com"]
