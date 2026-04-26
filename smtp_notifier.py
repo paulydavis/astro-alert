@@ -31,12 +31,14 @@ class EmailResult:
 
 
 def _clean(s: Optional[str]) -> str:
+    """Normalize and strip a credential string, removing invisible Unicode."""
     if not s:
         return ""
     return unicodedata.normalize("NFKC", s).strip()
 
 
 def _validate_address(addr: str) -> Optional[str]:
+    """Return an error string if addr doesn't look like a valid email, else None."""
     if not addr:
         return "Email address is empty."
     if "@" not in addr:
@@ -55,7 +57,7 @@ def _load_smtp_config() -> tuple[str, str, str, int]:
     password = _clean(os.getenv("SMTP_PASSWORD") or os.getenv("GMAIL_APP_PASSWORD", ""))
     host = _clean(os.getenv("SMTP_HOST", "")) or DEFAULT_SMTP_HOST
     try:
-        port = int(os.getenv("SMTP_PORT", DEFAULT_SMTP_PORT))
+        port = int(os.getenv("SMTP_PORT", str(DEFAULT_SMTP_PORT)))
     except (ValueError, TypeError):
         port = DEFAULT_SMTP_PORT
     return user, password, host, port
@@ -139,8 +141,10 @@ def send_test_email() -> EmailResult:
     smtp_user, smtp_password, smtp_host, smtp_port = _load_smtp_config()
     email_to = _clean(os.getenv("ALERT_EMAIL_TO")) or smtp_user
 
-    if not smtp_user or not smtp_password:
-        return EmailResult(sent=False, error="Credentials not configured.")
+    if not smtp_user:
+        return EmailResult(sent=False, error="Missing env var: SMTP_USER")
+    if not smtp_password:
+        return EmailResult(sent=False, error="Missing env var: SMTP_PASSWORD")
     for addr in (smtp_user, email_to):
         err = _validate_address(addr)
         if err:

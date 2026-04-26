@@ -162,8 +162,7 @@ class TestSendMultiSiteAlert:
 
     def test_missing_env_var_returns_error(self):
         incomplete = {k: v for k, v in ENV.items() if k != "SMTP_PASSWORD"}
-        with patch.dict("os.environ", incomplete, clear=False):
-            import os; os.environ.pop("SMTP_PASSWORD", None)
+        with patch.dict("os.environ", incomplete, clear=True):
             result = send_multi_site_alert([make_report()])
         assert not result.sent
         assert "SMTP_PASSWORD" in result.error
@@ -190,6 +189,30 @@ class TestSendMultiSiteAlert:
 
         assert not result.sent
         assert result.error is not None
+
+    def test_custom_smtp_host_and_port_are_used(self):
+        env = {**ENV, "SMTP_HOST": "smtp.fastmail.com", "SMTP_PORT": "465"}
+        with patch.dict("os.environ", env, clear=True):
+            with patch("smtp_notifier.smtplib.SMTP") as mock_cls:
+                mock_cls.return_value.__enter__ = lambda s: s
+                mock_cls.return_value.__exit__ = MagicMock(return_value=False)
+                mock_cls.return_value.login = MagicMock()
+                mock_cls.return_value.send_message = MagicMock()
+                send_multi_site_alert([make_report()])
+            assert mock_cls.call_args[0][0] == "smtp.fastmail.com"
+            assert mock_cls.call_args[0][1] == 465
+
+    def test_gmail_fallback_vars_work(self):
+        env = {"GMAIL_USER": "user@gmail.com", "GMAIL_APP_PASSWORD": "pw",
+               "ALERT_EMAIL_TO": "user@gmail.com"}
+        with patch.dict("os.environ", env, clear=True):
+            with patch("smtp_notifier.smtplib.SMTP") as mock_cls:
+                mock_cls.return_value.__enter__ = lambda s: s
+                mock_cls.return_value.__exit__ = MagicMock(return_value=False)
+                mock_cls.return_value.login = MagicMock()
+                mock_cls.return_value.send_message = MagicMock()
+                result = send_multi_site_alert([make_report()])
+        assert result.sent
 
 
 # --- _clean ------------------------------------------------------------------
@@ -276,7 +299,7 @@ class TestSendTestEmail:
         with patch.dict("os.environ", {}, clear=True):
             result = send_test_email()
         assert not result.sent
-        assert "not configured" in result.error.lower()
+        assert "SMTP_USER" in result.error
 
     def test_returns_error_on_invalid_smtp_user(self):
         env = {**ENV, "SMTP_USER": "notanemail"}
