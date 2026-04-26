@@ -16,7 +16,7 @@ Astro Alert has a graphical control panel with four tabs:
 
 ![Add Site dialog](screenshots/add_site_dialog.png)
 
-**Schedule** — install or remove the two daily cron jobs with a single click (macOS/Linux) or Task Scheduler tasks (Windows).
+**Schedule** — set up the two automatic daily emails with one click. Astro Alert runs itself in the background every day — no need to remember to open it.
 
 ![Schedule](screenshots/schedule.png)
 
@@ -135,7 +135,7 @@ sudo dnf install python3-tkinter
 
 ### 2. Configure credentials
 
-**Option A — GUI (easiest):** open `python3 gui.py`. If no credentials are configured, the app opens directly on the **Settings** tab. Enter your Gmail address and App Password and click **Save Credentials**. While you're there, set your **Home Location** — search your address and click **Save Home Location** so drive times calculate automatically when you add sites.
+**Option A — GUI (easiest):** open the app. If no credentials are configured, it opens directly on the **Settings** tab. Enter your Gmail address and App Password and click **Save Credentials**. While you're there, set your **Home Location** — search your address and click **Save Home Location** so drive times calculate automatically when you add sites.
 
 **Option B — manually:** copy `.env.example` to `.env` (in the same directory as the source) and fill in your details. Never commit `.env`.
 
@@ -177,7 +177,7 @@ The included `sites.json` is pre-loaded with dark sites near Durham, NC. To use 
 cp sites.example.json sites.json
 ```
 
-**Option A — GUI (easiest):** open `python3 gui.py`, go to the Sites tab, and click **Add Site**. Type a place name to geocode coordinates and elevation automatically. Click **Calculate ↗** next to the Drive field to get a real driving time from your home (requires Home Location to be set in Settings first).
+**Option A — GUI (easiest):** open the app, go to the **Sites** tab, and click **Add Site**. Type a place name to geocode coordinates and elevation automatically. Click **Calculate ↗** next to the Drive field to get a real driving time from your home (requires Home Location to be set in Settings first).
 
 **Option B — CLI:**
 
@@ -194,9 +194,11 @@ python3 astro_alert.py list-sites
 
 Find your Bortle class at [lightpollutionmap.info](https://www.lightpollutionmap.info) and your IANA timezone at [en.wikipedia.org/wiki/List_of_tz_database_time_zones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 
-### 4. Install cron jobs
+### 4. Set up automatic daily emails
 
-**Option A — GUI:** open `python3 gui.py`, go to the Schedule tab, and click **Install Schedule**.
+A cron job (macOS/Linux) or Scheduled Task (Windows) is a background timer built into your OS — it runs a program at a set time each day without you having to do anything. Astro Alert uses two of these to send your forecast emails automatically.
+
+**Option A — GUI (easiest):** open the app, go to the **Schedule** tab, and click **Install Schedule**. Done.
 
 **Option B — manual:** edit your crontab (`crontab -e`) and add these two lines (replace `/path/to/python3` and `/path/to/astro-alert`):
 
