@@ -753,7 +753,7 @@ class AstroAlertApp(tk.Tk):
         threading.Thread(target=self._do_test_email, daemon=True).start()
 
     def _do_test_email(self):
-        from gmail_notifier import send_test_email
+        from smtp_notifier import send_test_email
         result = send_test_email()
         self.after(0, self._test_email_done, result)
 
