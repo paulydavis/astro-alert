@@ -70,6 +70,8 @@ def add_site(
     elevation_m: float,
     bortle: int,
     timezone: str,
+    drive_min: Optional[int] = None,
+    notes: Optional[str] = None,
     set_active: bool = False,
 ) -> Site:
     """Add a new site (or overwrite an existing one) and optionally make it active."""
@@ -82,11 +84,25 @@ def add_site(
         "elevation_m": elevation_m,
         "bortle": bortle,
         "timezone": timezone,
+        "drive_min": drive_min,
+        "notes": notes or "",
     }
     if set_active:
         data["active_site"] = key
     _save_raw(data)
     return Site(key, sites[key])
+
+
+def delete_site(key: str) -> None:
+    """Delete a site by key, raising KeyError if not found."""
+    data = _load_raw()
+    if key not in data.get("sites", {}):
+        known = ", ".join(data.get("sites", {})) or "(none)"
+        raise KeyError(f"Site {key!r} not found. Known sites: {known}")
+    del data["sites"][key]
+    if data.get("active_site") == key:
+        data["active_site"] = None
+    _save_raw(data)
 
 
 def set_active_site(key: str) -> None:
