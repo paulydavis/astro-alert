@@ -581,10 +581,12 @@ class AstroAlertApp(tk.Tk):
         self._cred_to_var.set(vals.get("ALERT_EMAIL_TO", ""))
 
     def _save_credentials(self):
+        import unicodedata
         from data_dir import ENV_FILE
-        gmail_user = self._cred_user_var.get().strip()
-        gmail_pass = self._cred_pass_var.get().strip()
-        alert_to   = self._cred_to_var.get().strip()
+        def _norm(s): return unicodedata.normalize("NFKC", s).strip()
+        gmail_user = _norm(self._cred_user_var.get())
+        gmail_pass = _norm(self._cred_pass_var.get())
+        alert_to   = _norm(self._cred_to_var.get())
         lines = []
         if gmail_user:
             lines.append(f"GMAIL_USER={gmail_user}")
