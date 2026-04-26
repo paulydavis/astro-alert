@@ -103,7 +103,7 @@ def cmd_run(args) -> None:
 
     result = send_multi_site_alert(reports, night_label=night_label)
     if result.sent:
-        print(f"Alert sent via EMAIL ({result['detail']})")
+        print("Alert sent via EMAIL")
     else:
         print(f"Alert failed: {result.error}", file=sys.stderr)
         sys.exit(1)
