@@ -30,7 +30,7 @@ python3 gui.py
 
 ![Schedule](screenshots/schedule.png)
 
-**Settings** — enter your Gmail address and App Password. Credentials are saved to your OS user data directory (never next to the source files).
+**Settings** — enter your Gmail address and App Password. Also set your **Home Location** (address search with autocomplete) — this becomes the starting point for automatic drive-time calculations. Credentials and home location are saved to your OS user data directory (never next to the source files).
 
 ## Packaged app (no Python required)
 
@@ -127,7 +127,7 @@ pip install requests ephem python-dotenv
 
 ### 2. Configure credentials
 
-**Option A — GUI (easiest):** open `python3 gui.py`. If no credentials are configured, the app opens directly on the **Settings** tab. Enter your Gmail address and App Password and click **Save Credentials**.
+**Option A — GUI (easiest):** open `python3 gui.py`. If no credentials are configured, the app opens directly on the **Settings** tab. Enter your Gmail address and App Password and click **Save Credentials**. While you're there, set your **Home Location** — search your address and click **Save Home Location** so drive times calculate automatically when you add sites.
 
 **Option B — manually:** copy `.env.example` to `.env` (in the same directory as the source) and fill in your details. Never commit `.env`.
 
@@ -169,7 +169,7 @@ The included `sites.json` is pre-loaded with dark sites near Durham, NC. To use 
 cp sites.example.json sites.json
 ```
 
-**Option A — GUI (easiest):** open `python3 gui.py`, go to the Sites tab, and click **Add Site**. Type a place name to geocode coordinates automatically.
+**Option A — GUI (easiest):** open `python3 gui.py`, go to the Sites tab, and click **Add Site**. Type a place name to geocode coordinates and elevation automatically. Click **Calculate ↗** next to the Drive field to get a real driving time from your home (requires Home Location to be set in Settings first).
 
 **Option B — CLI:**
 
