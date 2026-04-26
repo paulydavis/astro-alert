@@ -152,7 +152,7 @@ class AstroAlertApp(tk.Tk):
 
     def _build_notebook(self):
         ttk.Separator(self).pack(fill="x", pady=(16, 0))
-        nb = ttk.Notebook(self)
+        nb = self._nb = ttk.Notebook(self)
         nb.pack(fill="both", expand=True)
 
         self._tab_dash  = ttk.Frame(nb)
@@ -418,7 +418,7 @@ class AstroAlertApp(tk.Tk):
 
     def _build_schedule_tab(self, parent):
         inner = ttk.Frame(parent)
-        inner.place(relx=0.5, rely=0.46, anchor="center")
+        inner.pack(expand=True)
 
         ttk.Label(inner, text="Scheduled Alerts",
                   font=(FONT_PROP, 17, "bold")).pack(pady=(0, 5))

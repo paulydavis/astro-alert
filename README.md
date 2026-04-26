@@ -8,6 +8,28 @@ Go/no-go email alert system for astrophotography sessions. Fetches weather, atmo
 - **Refractor:** Askar 120 APO + 0.8× reducer — 672mm f/5.6 (~2.0° × 1.34° FOV)
 - **Mount:** ZWO AM5N
 
+## GUI
+
+A graphical control panel is included — run it with:
+
+```bash
+python3 gui.py
+```
+
+**Dashboard** — run a dry-run or live forecast for any site, with colour-coded GO/NO-GO output.
+
+![Dashboard](screenshots/dashboard.png)
+
+**Sites** — add, edit, delete, and activate sites. The Add Site dialog geocodes a place name to fill coordinates automatically, fetches elevation from Open-Meteo, and links to lightpollutionmap.info for Bortle lookup.
+
+![Sites](screenshots/sites.png)
+
+![Add Site dialog](screenshots/add_site_dialog.png)
+
+**Schedule** — install or remove the two daily cron jobs with a single click (macOS/Linux) or Task Scheduler tasks (Windows).
+
+![Schedule](screenshots/schedule.png)
+
 ## How it works
 
 Every evening at **6pm**, an email arrives with tomorrow night's forecast across all configured sites — so you have time to plan a dark site trip. At **2pm**, a second check runs for tonight; that email only sends if at least one site scores GO.
@@ -68,13 +90,15 @@ To create a Gmail App Password: [myaccount.google.com/apppasswords](https://myac
 
 ### 3. Set up your sites
 
-The included `sites.json` is pre-loaded with dark sites near Durham, NC. To use your own locations, replace it with the template and add your sites:
+The included `sites.json` is pre-loaded with dark sites near Durham, NC. To use your own locations, replace it with the template:
 
 ```bash
 cp sites.example.json sites.json
 ```
 
-Then add your sites via the CLI:
+**Option A — GUI (easiest):** open `python3 gui.py`, go to the Sites tab, and click **Add Site**. Type a place name to geocode coordinates automatically.
+
+**Option B — CLI:**
 
 ```bash
 # Add your backyard
@@ -91,15 +115,9 @@ Find your Bortle class at [lightpollutionmap.info](https://www.lightpollutionmap
 
 ### 4. Install cron jobs
 
-```bash
-# Find your python path
-which python3
+**Option A — GUI:** open `python3 gui.py`, go to the Schedule tab, and click **Install Schedule**.
 
-# Edit your crontab
-crontab -e
-```
-
-Add these two lines (replace `/path/to/python3` and `/path/to/astro-alert`):
+**Option B — manual:** edit your crontab (`crontab -e`) and add these two lines (replace `/path/to/python3` and `/path/to/astro-alert`):
 
 ```
 # 6pm daily — tomorrow night's forecast (always sends)
@@ -185,13 +203,15 @@ Sites are listed in drive-time order (shortest first). The subject line calls ou
 ```
 astro_alert/
 ├── astro_alert.py       # CLI entry point
+├── gui.py               # Tkinter GUI (dashboard, sites, schedule)
+├── scheduler_setup.py   # Cross-platform cron / Task Scheduler install
 ├── site_manager.py      # Load/save sites.json
 ├── weather.py           # Open-Meteo weather fetch
 ├── seeing.py            # 7timer.info seeing/transparency fetch
 ├── moon.py              # Moon phase and rise/set via ephem
 ├── scorer.py            # Bortle-aware 0–100 scoring
 ├── gmail_notifier.py    # Gmail SMTP email sender
-├── notifier.py          # Alert dispatch (email; SMS pending registration)
+├── notifier.py          # Alert dispatch
 ├── sites.json           # Site database
 ├── .env                 # Credentials (never commit)
 ├── .env.example         # Credential template
