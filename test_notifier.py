@@ -104,7 +104,7 @@ class TestSendMultiSiteAlert:
         )
         sent_msg = {}
         mock_smtp = self._make_smtp()
-        mock_smtp.send_message = lambda msg: sent_msg.update({"msg": msg})
+        mock_smtp.send_message = lambda msg, **kw: sent_msg.update({"msg": msg})
         with patch.dict("os.environ", ENV):
             with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):
                 send_multi_site_alert([report])
@@ -123,7 +123,7 @@ class TestSendMultiSiteAlert:
     def test_go_site_in_subject(self):
         sent_msg = {}
         mock_smtp = self._make_smtp()
-        def capture(msg):
+        def capture(msg, **kw):
             sent_msg["msg"] = msg
         mock_smtp.send_message = capture
 
@@ -137,7 +137,7 @@ class TestSendMultiSiteAlert:
     def test_nogo_subject_shows_best_site(self):
         sent_msg = {}
         mock_smtp = self._make_smtp()
-        mock_smtp.send_message = lambda msg: sent_msg.update({"msg": msg})
+        mock_smtp.send_message = lambda msg, **kw: sent_msg.update({"msg": msg})
 
         reports = [
             make_report(site_name="Jordan Lake", go=False),
@@ -152,7 +152,7 @@ class TestSendMultiSiteAlert:
     def test_night_label_in_subject(self):
         sent_msg = {}
         mock_smtp = self._make_smtp()
-        mock_smtp.send_message = lambda msg: sent_msg.update({"msg": msg})
+        mock_smtp.send_message = lambda msg, **kw: sent_msg.update({"msg": msg})
 
         with patch.dict("os.environ", ENV):
             with patch("gmail_notifier.smtplib.SMTP", return_value=mock_smtp):

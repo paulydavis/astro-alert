@@ -5,7 +5,6 @@ import smtplib
 import unicodedata
 from dataclasses import dataclass
 from email.message import EmailMessage
-from email.policy import SMTP as SMTP_POLICY
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -89,7 +88,7 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
         body_lines.extend(_format_report(report))
         body_lines.append("")
 
-    msg = EmailMessage(policy=SMTP_POLICY)
+    msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = gmail_user
     msg["To"] = email_to
@@ -100,7 +99,7 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
             smtp.ehlo()
             smtp.starttls()
             smtp.login(gmail_user, gmail_app_password)
-            smtp.send_message(msg)
+            smtp.send_message(msg, from_addr=gmail_user, to_addrs=[email_to])
         return EmailResult(sent=True)
     except smtplib.SMTPAuthenticationError:
         return EmailResult(sent=False, error="Gmail auth failed - check GMAIL_APP_PASSWORD")
@@ -119,7 +118,7 @@ def send_test_email() -> EmailResult:
     if not gmail_user or not gmail_app_password:
         return EmailResult(sent=False, error="Credentials not configured.")
 
-    msg = EmailMessage(policy=SMTP_POLICY)
+    msg = EmailMessage()
     msg["Subject"] = "Astro Alert - Test Email"
     msg["From"] = gmail_user
     msg["To"] = email_to
@@ -130,7 +129,7 @@ def send_test_email() -> EmailResult:
             smtp.ehlo()
             smtp.starttls()
             smtp.login(gmail_user, gmail_app_password)
-            smtp.send_message(msg)
+            smtp.send_message(msg, from_addr=gmail_user, to_addrs=[email_to])
         return EmailResult(sent=True)
     except smtplib.SMTPAuthenticationError:
         return EmailResult(sent=False, error="Gmail auth failed - check your App Password.")
