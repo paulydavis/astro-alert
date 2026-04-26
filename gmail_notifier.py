@@ -37,6 +37,20 @@ def _clean(s: Optional[str]) -> str:
     return unicodedata.normalize("NFKC", s).strip()
 
 
+def _validate_address(addr: str) -> Optional[str]:
+    """Return an error string if addr doesn't look like a valid email, else None."""
+    if not addr:
+        return "Email address is empty."
+    if "@" not in addr:
+        return f"'{addr}' is missing @."
+    local, _, domain = addr.partition("@")
+    if not local:
+        return f"'{addr}' has nothing before @."
+    if "." not in domain or ".." in domain or domain.startswith(".") or domain.endswith("."):
+        return f"'{addr}' has an invalid domain."
+    return None
+
+
 def _format_report(report: SiteReport) -> list[str]:
     score = report.score
     moon = report.moon
@@ -66,6 +80,10 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
     }.items() if not v]
     if missing:
         return EmailResult(sent=False, error=f"Missing env vars: {', '.join(missing)}")
+    for addr in (gmail_user, email_to):
+        err = _validate_address(addr)
+        if err:
+            return EmailResult(sent=False, error=f"Invalid address: {err}")
 
     go_sites = [r for r in reports if r.score.go]
     best = go_sites[0] if go_sites else None
@@ -117,6 +135,10 @@ def send_test_email() -> EmailResult:
 
     if not gmail_user or not gmail_app_password:
         return EmailResult(sent=False, error="Credentials not configured.")
+    for addr in (gmail_user, email_to):
+        err = _validate_address(addr)
+        if err:
+            return EmailResult(sent=False, error=f"Invalid address: {err}")
 
     msg = EmailMessage()
     msg["Subject"] = "Astro Alert - Test Email"
