@@ -145,7 +145,21 @@ When running from a packaged app, credentials are saved to your OS user data dir
 | Windows | `%APPDATA%\AstroAlert\.env` |
 | Linux | `~/.config/AstroAlert/.env` |
 
-To create a Gmail App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) (requires 2-Step Verification).
+#### Creating a Gmail App Password
+
+Astro Alert uses Gmail's SMTP service to send email. It needs an **App Password** — a 16-character code that works in place of your real password. Your normal Gmail password will not work here.
+
+**Prerequisites:** 2-Step Verification must be enabled on your Google account. If it isn't, [enable it first](https://myaccount.google.com/signinoptions/twosv).
+
+**Steps:**
+
+1. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) (sign in if prompted)
+2. Under "App name", type something like `Astro Alert`
+3. Click **Create**
+4. Google shows a 16-character password like `zubn qqeh qqyj ywnt` — copy it now (it won't be shown again)
+5. Paste it into the **App password** field in the Settings tab (spaces are fine — Gmail accepts them)
+
+> **Note:** If you don't see the App Passwords page, your account may be managed by Google Workspace (a school or company). In that case an admin needs to allow less-secure app access, or you need to use a personal Gmail account.
 
 ### 3. Set up your sites
 
