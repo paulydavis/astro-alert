@@ -47,10 +47,10 @@ def _format_report(report: SiteReport) -> list[str]:
 def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight") -> EmailResult:
     """Send a single email summarising all sites. Returns EmailResult — never raises."""
     from data_dir import ENV_FILE
-    load_dotenv(ENV_FILE)
+    load_dotenv(ENV_FILE, override=True)
     gmail_user = os.getenv("GMAIL_USER")
     gmail_app_password = os.getenv("GMAIL_APP_PASSWORD")
-    email_to = os.getenv("ALERT_EMAIL_TO", gmail_user)
+    email_to = os.getenv("ALERT_EMAIL_TO") or gmail_user
 
     missing = [k for k, v in {
         "GMAIL_USER": gmail_user,
@@ -103,10 +103,10 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
 def send_test_email() -> EmailResult:
     """Send a one-line test email to verify credentials. Returns EmailResult — never raises."""
     from data_dir import ENV_FILE
-    load_dotenv(ENV_FILE)
+    load_dotenv(ENV_FILE, override=True)
     gmail_user = os.getenv("GMAIL_USER")
     gmail_app_password = os.getenv("GMAIL_APP_PASSWORD")
-    email_to = os.getenv("ALERT_EMAIL_TO", gmail_user)
+    email_to = os.getenv("ALERT_EMAIL_TO") or gmail_user
 
     if not gmail_user or not gmail_app_password:
         return EmailResult(sent=False, error="Credentials not configured.")
