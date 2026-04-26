@@ -4,15 +4,12 @@ import os
 import smtplib
 from dataclasses import dataclass
 from email.message import EmailMessage
-from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
 
 from moon import MoonInfo
 from scorer import Score
-
-load_dotenv(Path(__file__).parent / ".env")
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -49,6 +46,8 @@ def _format_report(report: SiteReport) -> list[str]:
 
 def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight") -> EmailResult:
     """Send a single email summarising all sites. Returns EmailResult — never raises."""
+    from data_dir import ENV_FILE
+    load_dotenv(ENV_FILE)
     gmail_user = os.getenv("GMAIL_USER")
     gmail_app_password = os.getenv("GMAIL_APP_PASSWORD")
     email_to = os.getenv("ALERT_EMAIL_TO", gmail_user)
@@ -97,5 +96,35 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
         return EmailResult(sent=True)
     except smtplib.SMTPAuthenticationError:
         return EmailResult(sent=False, error="Gmail auth failed — check GMAIL_APP_PASSWORD")
+    except Exception as e:
+        return EmailResult(sent=False, error=str(e))
+
+
+def send_test_email() -> EmailResult:
+    """Send a one-line test email to verify credentials. Returns EmailResult — never raises."""
+    from data_dir import ENV_FILE
+    load_dotenv(ENV_FILE)
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_app_password = os.getenv("GMAIL_APP_PASSWORD")
+    email_to = os.getenv("ALERT_EMAIL_TO", gmail_user)
+
+    if not gmail_user or not gmail_app_password:
+        return EmailResult(sent=False, error="Credentials not configured.")
+
+    msg = EmailMessage()
+    msg["Subject"] = "Astro Alert — Test Email"
+    msg["From"] = gmail_user
+    msg["To"] = email_to
+    msg.set_content("Your Astro Alert credentials are working correctly! 🔭")
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(gmail_user, gmail_app_password)
+            smtp.send_message(msg)
+        return EmailResult(sent=True)
+    except smtplib.SMTPAuthenticationError:
+        return EmailResult(sent=False, error="Gmail auth failed — check your App Password.")
     except Exception as e:
         return EmailResult(sent=False, error=str(e))

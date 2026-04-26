@@ -78,9 +78,9 @@ class TestAppInit:
     def test_window_title(self, app):
         assert app.title() == "Astro Alert"
 
-    def test_has_notebook_with_three_tabs(self, app):
+    def test_has_notebook_with_four_tabs(self, app):
         assert hasattr(app, "_nb")
-        assert app._nb.index("end") == 3
+        assert app._nb.index("end") == 4
 
     def test_run_button_exists(self, app):
         assert hasattr(app, "_run_btn")
@@ -780,3 +780,137 @@ class TestExceptionHandlers:
              patch("tkinter.messagebox.showerror") as mock_err:
             app._remove_schedule()
         mock_err.assert_called_once()
+
+
+# ── Settings tab ──────────────────────────────────────────────────────────────
+
+class TestSettingsTab:
+    def test_settings_tab_exists(self, app):
+        assert hasattr(app, "_tab_settings")
+
+    def test_credential_vars_exist(self, app):
+        assert hasattr(app, "_cred_user_var")
+        assert hasattr(app, "_cred_pass_var")
+        assert hasattr(app, "_cred_to_var")
+
+    def test_test_button_exists(self, app):
+        assert hasattr(app, "_test_btn")
+
+    def test_load_credentials_sets_vars_from_env_file(self, app, tmp_path, monkeypatch):
+        fake_env = tmp_path / ".env"
+        fake_env.write_text("GMAIL_USER=test@example.com\nGMAIL_APP_PASSWORD=secret\n")
+        import data_dir
+        monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
+        app._load_credentials_to_form()
+        assert app._cred_user_var.get() == "test@example.com"
+        assert app._cred_pass_var.get() == "secret"
+
+    def test_load_credentials_empty_when_no_env_file(self, app, tmp_path, monkeypatch):
+        import data_dir
+        monkeypatch.setattr(data_dir, "ENV_FILE", tmp_path / "nonexistent.env")
+        app._load_credentials_to_form()
+        assert app._cred_user_var.get() == ""
+        assert app._cred_pass_var.get() == ""
+
+    def test_save_credentials_writes_env_file(self, app, tmp_path, monkeypatch):
+        fake_env = tmp_path / ".env"
+        import data_dir
+        monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
+        app._cred_user_var.set("me@gmail.com")
+        app._cred_pass_var.set("mypassword")
+        with patch("tkinter.messagebox.showinfo"):
+            app._save_credentials()
+        content = fake_env.read_text()
+        assert "GMAIL_USER=me@gmail.com" in content
+        assert "GMAIL_APP_PASSWORD=mypassword" in content
+
+    def test_save_credentials_omits_empty_fields(self, app, tmp_path, monkeypatch):
+        fake_env = tmp_path / ".env"
+        import data_dir
+        monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
+        app._cred_user_var.set("me@gmail.com")
+        app._cred_pass_var.set("")
+        app._cred_to_var.set("")
+        with patch("tkinter.messagebox.showinfo"):
+            app._save_credentials()
+        content = fake_env.read_text()
+        assert "GMAIL_APP_PASSWORD" not in content
+
+    def test_toggle_password_reveals_text(self, app):
+        assert app._pass_shown is False
+        app._toggle_password()
+        assert app._pass_shown is True
+        assert app._pass_entry.cget("show") == ""
+
+    def test_toggle_password_hides_again(self, app):
+        app._toggle_password()
+        app._toggle_password()
+        assert app._pass_shown is False
+        assert app._pass_entry.cget("show") == "•"
+
+    def test_send_test_email_disables_button_and_starts_thread(self, app):
+        with patch("threading.Thread") as mock_thread:
+            mock_thread.return_value.start = MagicMock()
+            app._send_test_email()
+        assert str(app._test_btn.cget("state")) == "disabled"
+        mock_thread.assert_called_once()
+
+    def test_test_email_done_success_shows_info(self, app):
+        from gmail_notifier import EmailResult
+        result = EmailResult(sent=True)
+        with patch("tkinter.messagebox.showinfo") as mock_info:
+            app._test_email_done(result)
+        mock_info.assert_called_once()
+        assert str(app._test_btn.cget("state")) == "normal"
+
+    def test_test_email_done_failure_shows_error(self, app):
+        from gmail_notifier import EmailResult
+        result = EmailResult(sent=False, error="Auth failed")
+        with patch("tkinter.messagebox.showerror") as mock_err:
+            app._test_email_done(result)
+        mock_err.assert_called_once()
+        assert "Auth failed" in mock_err.call_args[0][1]
+
+    def test_cred_warn_hidden_when_credentials_present(self, app, tmp_path, monkeypatch):
+        fake_env = tmp_path / ".env"
+        fake_env.write_text("GMAIL_USER=u@g.com\nGMAIL_APP_PASSWORD=pw\n")
+        import data_dir
+        monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
+        app._refresh_cred_banner()
+        # pack_info raises TclError if widget is not managed (i.e., pack_forget was called)
+        import tkinter as tk
+        try:
+            app._cred_warn.pack_info()
+            is_packed = True
+        except tk.TclError:
+            is_packed = False
+        assert not is_packed
+
+    def test_cred_warn_shown_when_credentials_missing(self, app, tmp_path, monkeypatch):
+        fake_env = tmp_path / "empty.env"
+        import data_dir
+        monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
+        app._refresh_cred_banner()
+        import tkinter as tk
+        try:
+            app._cred_warn.pack_info()
+            is_packed = True
+        except tk.TclError:
+            is_packed = False
+        assert is_packed
+
+    def test_check_first_run_switches_to_settings_when_no_creds(self, app, tmp_path, monkeypatch):
+        fake_env = tmp_path / "empty.env"
+        import data_dir
+        monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
+        app._check_first_run()
+        assert app._nb.index("current") == app._nb.index(app._tab_settings)
+
+    def test_check_first_run_stays_on_dashboard_when_creds_present(self, app, tmp_path, monkeypatch):
+        fake_env = tmp_path / ".env"
+        fake_env.write_text("GMAIL_USER=u@g.com\nGMAIL_APP_PASSWORD=pw\n")
+        import data_dir
+        monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
+        app._nb.select(app._tab_dash)
+        app._check_first_run()
+        assert app._nb.index("current") == app._nb.index(app._tab_dash)

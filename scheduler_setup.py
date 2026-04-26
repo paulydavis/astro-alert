@@ -13,9 +13,17 @@ import subprocess
 import sys
 from pathlib import Path
 
-PYTHON = sys.executable
-SCRIPT = str(Path(__file__).parent / "astro_alert.py")
-LOG    = str(Path(__file__).parent / "astro_alert.log")
+from data_dir import DATA_DIR
+
+_FROZEN = getattr(sys, "frozen", False)
+LOG = str(DATA_DIR / "astro_alert.log")
+
+if _FROZEN:
+    _CMD = f'"{sys.executable}"'
+else:
+    _PYTHON = sys.executable
+    _SCRIPT = str(Path(__file__).parent / "astro_alert.py")
+    _CMD = f'"{_PYTHON}" "{_SCRIPT}"'
 
 _CRON_TAG  = "astro_alert.py"
 _WIN_TASKS = ("AstroAlert-6pm", "AstroAlert-2pm")
@@ -52,9 +60,11 @@ def get_schedule_status() -> tuple[bool, str]:
 # ── cron (macOS / Linux) ──────────────────────────────────────────────────────
 
 def _cron_lines() -> list[str]:
+    # frozen builds embed "astro_alert.py" as a comment so _CRON_TAG matching still works
+    suffix = "  # astro_alert.py" if _FROZEN else ""
     return [
-        f'0 18 * * * "{PYTHON}" "{SCRIPT}" --tomorrow >> "{LOG}" 2>&1',
-        f'0 14 * * * "{PYTHON}" "{SCRIPT}" --only-if-go >> "{LOG}" 2>&1',
+        f'0 18 * * * {_CMD} --tomorrow >> "{LOG}" 2>&1{suffix}',
+        f'0 14 * * * {_CMD} --only-if-go >> "{LOG}" 2>&1{suffix}',
     ]
 
 
@@ -95,7 +105,7 @@ def _win_install() -> None:
         ("AstroAlert-2pm", "--only-if-go", "14:00"),
     ]
     for name, flag, start_time in jobs:
-        cmd = f'"{PYTHON}" "{SCRIPT}" {flag}'
+        cmd = f'{_CMD} {flag}'
         result = _schtasks("/create", "/f", "/tn", name, "/tr", cmd,
                            "/sc", "DAILY", "/st", start_time)
         if result.returncode != 0:

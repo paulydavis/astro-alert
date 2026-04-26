@@ -1,10 +1,9 @@
 """Site management for astro_alert — loads/saves sites.json."""
 
 import json
-from pathlib import Path
 from typing import Optional
 
-SITES_FILE = Path(__file__).parent / "sites.json"
+from data_dir import SITES_FILE
 
 
 class Site:

@@ -56,6 +56,8 @@ class AstroAlertApp(tk.Tk):
         self._build_statusbar()
 
         self.after(100, self._refresh_sites)
+        self.after(200, self._refresh_cred_banner)
+        self.after(400, self._check_first_run)
 
     # ── Styles ─────────────────────────────────────────────────────────────────
 
@@ -155,23 +157,35 @@ class AstroAlertApp(tk.Tk):
         nb = self._nb = ttk.Notebook(self)
         nb.pack(fill="both", expand=True)
 
-        self._tab_dash  = ttk.Frame(nb)
-        self._tab_sites = ttk.Frame(nb)
-        self._tab_sched = ttk.Frame(nb)
+        self._tab_dash     = ttk.Frame(nb)
+        self._tab_sites    = ttk.Frame(nb)
+        self._tab_sched    = ttk.Frame(nb)
+        self._tab_settings = ttk.Frame(nb)
 
-        nb.add(self._tab_dash,  text="  Dashboard  ")
-        nb.add(self._tab_sites, text="  Sites  ")
-        nb.add(self._tab_sched, text="  Schedule  ")
+        nb.add(self._tab_dash,     text="  Dashboard  ")
+        nb.add(self._tab_sites,    text="  Sites  ")
+        nb.add(self._tab_sched,    text="  Schedule  ")
+        nb.add(self._tab_settings, text="  Settings  ")
 
         self._build_dashboard(self._tab_dash)
         self._build_sites_tab(self._tab_sites)
         self._build_schedule_tab(self._tab_sched)
+        self._build_settings_tab(self._tab_settings)
 
     # ── Dashboard ───────────────────────────────────────────────────────────────
 
     def _build_dashboard(self, parent):
+        # Credential warning banner (hidden until _refresh_cred_banner decides)
+        self._cred_warn = tk.Frame(parent, bg=WARN_CLR)
+        tk.Label(self._cred_warn, text="⚠  Gmail credentials not configured — alerts won't send.",
+                 bg=WARN_CLR, fg="#000000", font=(FONT_PROP, 12)).pack(side="left",
+                 padx=16, pady=8)
+        ttk.Button(self._cred_warn, text="Set up →",
+                   command=lambda: self._nb.select(self._tab_settings)).pack(
+            side="left", padx=(0, 12))
+
         # Controls row
-        ctrl = ttk.Frame(parent)
+        ctrl = self._ctrl_frame = ttk.Frame(parent)
         ctrl.pack(fill="x", padx=26, pady=(20, 0))
 
         self._night_var = tk.StringVar(value="tonight")
@@ -504,6 +518,124 @@ class AstroAlertApp(tk.Tk):
                 self._set_status("Schedule removed.")
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
+
+    # ── Settings tab ────────────────────────────────────────────────────────────
+
+    def _build_settings_tab(self, parent):
+        inner = ttk.Frame(parent)
+        inner.pack(expand=True)
+
+        ttk.Label(inner, text="Gmail Credentials",
+                  font=(FONT_PROP, 17, "bold")).pack(pady=(0, 5))
+        ttk.Label(inner,
+                  text="Used to send nightly go/no-go alerts. Credentials are stored locally.",
+                  style="Sub.TLabel").pack(pady=(0, 22))
+
+        card = ttk.Frame(inner, style="Card.TFrame")
+        card.pack(fill="x", ipadx=28, ipady=20)
+        card.columnconfigure(1, weight=1)
+
+        self._cred_user_var = tk.StringVar()
+        self._cred_pass_var = tk.StringVar()
+        self._cred_to_var   = tk.StringVar()
+        self._pass_shown    = False
+
+        fields = [
+            ("Gmail address",    self._cred_user_var, False),
+            ("App password",     self._cred_pass_var, True),
+            ("Alert recipient",  self._cred_to_var,   False),
+        ]
+        for row_idx, (label, var, is_pass) in enumerate(fields):
+            ttk.Label(card, text=label + ":", style="CardDim.TLabel").grid(
+                row=row_idx, column=0, sticky="w", pady=8, padx=(16, 12))
+            entry = ttk.Entry(card, textvariable=var, font=(FONT_PROP, 12), width=36,
+                              show="•" if is_pass else "")
+            entry.grid(row=row_idx, column=1, sticky="ew", pady=8)
+            if is_pass:
+                self._pass_entry = entry
+                ttk.Button(card, text="Show", width=6,
+                           command=self._toggle_password).grid(
+                    row=row_idx, column=2, padx=(8, 16), pady=8)
+
+        ttk.Label(card,
+                  text="Tip: use a Gmail App Password, not your main password.",
+                  style="CardDim.TLabel").grid(
+            row=len(fields), column=0, columnspan=3, pady=(4, 0), padx=16)
+
+        btn_row = ttk.Frame(inner)
+        btn_row.pack(pady=(20, 0))
+        ttk.Button(btn_row, text="Save Credentials", style="Accent.TButton",
+                   command=self._save_credentials).pack(side="left", padx=(0, 14))
+        self._test_btn = ttk.Button(btn_row, text="Send Test Email",
+                                     command=self._send_test_email)
+        self._test_btn.pack(side="left")
+
+        self.after(50, self._load_credentials_to_form)
+
+    def _load_credentials_to_form(self):
+        from data_dir import ENV_FILE
+        from dotenv import dotenv_values
+        vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
+        self._cred_user_var.set(vals.get("GMAIL_USER", ""))
+        self._cred_pass_var.set(vals.get("GMAIL_APP_PASSWORD", ""))
+        self._cred_to_var.set(vals.get("ALERT_EMAIL_TO", ""))
+
+    def _save_credentials(self):
+        from data_dir import ENV_FILE
+        gmail_user = self._cred_user_var.get().strip()
+        gmail_pass = self._cred_pass_var.get().strip()
+        alert_to   = self._cred_to_var.get().strip()
+        lines = []
+        if gmail_user:
+            lines.append(f"GMAIL_USER={gmail_user}")
+        if gmail_pass:
+            lines.append(f"GMAIL_APP_PASSWORD={gmail_pass}")
+        if alert_to:
+            lines.append(f"ALERT_EMAIL_TO={alert_to}")
+        ENV_FILE.write_text("\n".join(lines) + "\n")
+        self._refresh_cred_banner()
+        self._set_status("Credentials saved.")
+        messagebox.showinfo("Saved", "Credentials saved. Send a test email to verify.",
+                            parent=self)
+
+    def _toggle_password(self):
+        self._pass_shown = not self._pass_shown
+        self._pass_entry.configure(show="" if self._pass_shown else "•")
+
+    def _send_test_email(self):
+        self._test_btn.configure(state="disabled", text="Sending…")
+        threading.Thread(target=self._do_test_email, daemon=True).start()
+
+    def _do_test_email(self):
+        from gmail_notifier import send_test_email
+        result = send_test_email()
+        self.after(0, self._test_email_done, result)
+
+    def _test_email_done(self, result):
+        self._test_btn.configure(state="normal", text="Send Test Email")
+        if result.sent:
+            messagebox.showinfo("Success", "Test email sent! Check your inbox.", parent=self)
+            self._set_status("Test email sent.")
+        else:
+            messagebox.showerror("Failed", result.error or "Unknown error.", parent=self)
+            self._set_status("Test email failed.")
+
+    def _refresh_cred_banner(self):
+        from data_dir import ENV_FILE
+        from dotenv import dotenv_values
+        vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
+        has_creds = bool(vals.get("GMAIL_USER") and vals.get("GMAIL_APP_PASSWORD"))
+        if has_creds:
+            self._cred_warn.pack_forget()
+        else:
+            self._cred_warn.pack(fill="x", padx=0, pady=0, before=self._ctrl_frame)
+
+    def _check_first_run(self):
+        from data_dir import ENV_FILE
+        from dotenv import dotenv_values
+        vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
+        if not vals.get("GMAIL_USER") or not vals.get("GMAIL_APP_PASSWORD"):
+            self._nb.select(self._tab_settings)
 
     # ── Status bar ──────────────────────────────────────────────────────────────
 
