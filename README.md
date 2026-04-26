@@ -5,8 +5,8 @@ Go/no-go email alert system for astrophotography sessions. Fetches weather, atmo
 ## Hardware
 
 - **Camera:** ZWO ASI2600MC-Air (one-shot color)
-- **Refractor:** Askar V (~2–3° diagonal FOV)
-- **Mount:** ZWO AM3
+- **Refractor:** Askar 120 APO + 0.8× reducer — 672mm f/5.6 (~2.0° × 1.34° FOV)
+- **Mount:** ZWO AM5N
 
 ## How it works
 
