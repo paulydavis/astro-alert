@@ -371,10 +371,15 @@ class TestFetchReport:
         with patch("astro_alert.fetch_weather", return_value=mock_weather), \
              patch("astro_alert.fetch_seeing", return_value=mock_seeing), \
              patch("astro_alert.get_moon_info", return_value=mock_moon), \
+             patch("astro_alert.load_weights"), \
              patch("astro_alert.score_night") as mock_score:
             _fetch_report(site, target)
-        mock_score.assert_called_once_with(mock_weather, mock_seeing, mock_moon,
-                                           bortle=3, target_date=target)
+        # Check that score_night was called with the expected positional and keyword args
+        call_args = mock_score.call_args
+        assert call_args[0] == (mock_weather, mock_seeing, mock_moon)
+        assert call_args[1]["bortle"] == 3
+        assert call_args[1]["target_date"] == target
+        assert "weights" in call_args[1]
 
 
 # ---------------------------------------------------------------------------
