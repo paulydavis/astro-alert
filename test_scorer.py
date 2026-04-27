@@ -115,12 +115,12 @@ class TestWeatherScore:
 
 class TestSeeingScore:
     def test_excellent_seeing(self):
-        pts, warns = _seeing_score(make_seeing(seeing=8, transparency=8))
-        assert pts == 30
+        norm, warns = _seeing_score(make_seeing(seeing=8, transparency=8))
+        assert norm == 1.0
         assert not warns
 
     def test_poor_seeing_warning(self):
-        pts, warns = _seeing_score(make_seeing(seeing=2, transparency=6))
+        norm, warns = _seeing_score(make_seeing(seeing=2, transparency=6))
         assert any("seeing" in w.lower() for w in warns)
 
     def test_poor_transparency_warning(self):
@@ -128,9 +128,18 @@ class TestSeeingScore:
         assert any("transparency" in w.lower() for w in warns)
 
     def test_unavailable_returns_neutral(self):
-        pts, warns = _seeing_score(make_seeing(error="timeout"))
-        assert pts == 15
+        norm, warns = _seeing_score(make_seeing(error="timeout"))
+        assert norm == 0.5
         assert any("unavailable" in w.lower() for w in warns)
+
+    def test_seeing_weight_shifts_score(self):
+        from scoring_weights import ScoringWeights
+        # Seeing=8, transparency=2: seeing-heavy weights should score higher than even split
+        w_seeing_heavy = ScoringWeights(seeing_quality_weight=90, transparency_weight=10)
+        w_even = ScoringWeights(seeing_quality_weight=50, transparency_weight=50)
+        norm_heavy, _ = _seeing_score(make_seeing(seeing=8, transparency=2), weights=w_seeing_heavy)
+        norm_even, _ = _seeing_score(make_seeing(seeing=8, transparency=2), weights=w_even)
+        assert norm_heavy > norm_even
 
 
 # --- dark hours after moonset ------------------------------------------------

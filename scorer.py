@@ -120,12 +120,19 @@ def _weather_score(
     return weather_norm, warnings, int(avg_cloud)
 
 
-def _seeing_score(result: SeeingResult, target_date: Optional[date] = None) -> tuple[int, list[str]]:
-    """Score seeing/transparency 0–30."""
+def _seeing_score(
+    result: SeeingResult,
+    target_date: Optional[date] = None,
+    weights: Optional[ScoringWeights] = None,
+) -> tuple[float, list[str]]:
+    """Return (seeing_norm 0–1, warnings)."""
+    if weights is None:
+        weights = ScoringWeights()
+
     warnings = []
     if not result.ok or not result.hours:
         warnings.append("Seeing data unavailable")
-        return 15, warnings
+        return 0.5, warnings
 
     if target_date:
         window = _imaging_hours(target_date)
@@ -138,15 +145,21 @@ def _seeing_score(result: SeeingResult, target_date: Optional[date] = None) -> t
     avg_seeing = sum(h.seeing for h in night_hours) / len(night_hours)
     avg_transparency = sum(h.transparency for h in night_hours) / len(night_hours)
 
-    seeing_pts = int((avg_seeing / 8) * 15)
-    transp_pts = int((avg_transparency / 8) * 15)
+    seeing_raw = avg_seeing / 8.0
+    transp_raw = avg_transparency / 8.0
 
     if avg_seeing < 3:
         warnings.append(f"Poor seeing ({avg_seeing:.1f}/8)")
     if avg_transparency < 3:
         warnings.append(f"Poor transparency ({avg_transparency:.1f}/8)")
 
-    return seeing_pts + transp_pts, warnings
+    total_w = weights.seeing_quality_weight + weights.transparency_weight
+    seeing_norm = (
+        weights.seeing_quality_weight * seeing_raw
+        + weights.transparency_weight * transp_raw
+    ) / total_w
+
+    return seeing_norm, warnings
 
 
 def _dark_hours_after_moonset(info: MoonInfo) -> float:
@@ -207,9 +220,13 @@ def score_night(
     target_date: Optional[date] = None,
     go_threshold: int = 55,
 ) -> Score:
-    w_pts, w_warn, avg_cloud = _weather_score(weather, bortle, target_date)
-    s_pts, s_warn = _seeing_score(seeing, target_date)
+    w_norm, w_warn, avg_cloud = _weather_score(weather, bortle, target_date)
+    s_norm, s_warn = _seeing_score(seeing, target_date)
     m_pts, m_warn = _moon_score(moon)
+
+    # Convert normalized floats (0–1) back to integer scores for compatibility
+    w_pts = int(w_norm * 40)
+    s_pts = int(s_norm * 30)
 
     total = w_pts + s_pts + m_pts
     all_warnings = w_warn + s_warn + m_warn
