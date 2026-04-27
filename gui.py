@@ -63,6 +63,22 @@ def _osrm_drive_minutes(home_lat: float, home_lon: float,
     return round(seconds / 60)
 
 
+def _detect_ip_location() -> tuple[float, float, str]:
+    """Call ip-api.com and return (lat, lon, 'City, Region')."""
+    import requests
+    resp = requests.get(
+        "http://ip-api.com/json/",
+        params={"fields": "status,lat,lon,city,regionName"},
+        timeout=10,
+    )
+    if resp.status_code != 200:
+        raise RuntimeError(f"HTTP {resp.status_code}")
+    data = resp.json()
+    if data.get("status") != "success":
+        raise RuntimeError("Location not found")
+    return float(data["lat"]), float(data["lon"]), f"{data['city']}, {data['regionName']}"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main application window
 # ─────────────────────────────────────────────────────────────────────────────

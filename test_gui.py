@@ -80,6 +80,41 @@ def fake_env(tmp_path, monkeypatch):
     return path
 
 
+# ── _detect_ip_location ───────────────────────────────────────────────────────
+
+class TestDetectIpLocation:
+    def test_returns_lat_lon_display_on_success(self):
+        fake = MagicMock()
+        fake.status_code = 200
+        fake.json.return_value = {
+            "status": "success",
+            "lat": 35.99,
+            "lon": -78.89,
+            "city": "Durham",
+            "regionName": "North Carolina",
+        }
+        with patch("requests.get", return_value=fake):
+            lat, lon, display = gui._detect_ip_location()
+        assert lat == 35.99
+        assert lon == -78.89
+        assert display == "Durham, North Carolina"
+
+    def test_raises_on_non_200(self):
+        fake = MagicMock()
+        fake.status_code = 429
+        with patch("requests.get", return_value=fake):
+            with pytest.raises(RuntimeError, match="HTTP 429"):
+                gui._detect_ip_location()
+
+    def test_raises_on_fail_status(self):
+        fake = MagicMock()
+        fake.status_code = 200
+        fake.json.return_value = {"status": "fail", "message": "private range"}
+        with patch("requests.get", return_value=fake):
+            with pytest.raises(RuntimeError, match="Location not found"):
+                gui._detect_ip_location()
+
+
 # ── AstroAlertApp: initialisation ─────────────────────────────────────────────
 
 class TestAppInit:
