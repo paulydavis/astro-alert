@@ -1036,6 +1036,19 @@ class TestSettingsTab:
             app._check_first_run()
         assert app._do_ip_detect in started_targets
 
+    def test_check_first_run_spawns_detect_when_only_home_lat_set(self, app, fake_env, monkeypatch):
+        import data_dir
+        fake_env.write_text("HOME_LAT=35.99\n")  # LON is missing
+        monkeypatch.setattr(data_dir, "ENV_FILE", fake_env)
+        started_targets = []
+        def mock_thread(*a, **kw):
+            m = MagicMock()
+            m.start.side_effect = lambda: started_targets.append(kw.get("target"))
+            return m
+        with patch("threading.Thread", side_effect=mock_thread):
+            app._check_first_run()
+        assert app._do_ip_detect in started_targets
+
     def test_check_first_run_skips_detect_when_home_set(self, app, fake_env, monkeypatch):
         import data_dir
         fake_env.write_text("HOME_LAT=35.99\nHOME_LON=-78.89\n")
