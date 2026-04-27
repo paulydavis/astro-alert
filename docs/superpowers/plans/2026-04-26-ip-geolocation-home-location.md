@@ -338,7 +338,7 @@ def _check_first_run(self):
     smtp_pass = vals.get("SMTP_PASSWORD") or vals.get("GMAIL_APP_PASSWORD", "")
     if not smtp_user or not smtp_pass:
         self._nb.select(self._tab_settings)
-    if not vals.get("HOME_LAT") and not vals.get("HOME_LON"):
+    if not vals.get("HOME_LAT") or not vals.get("HOME_LON"):
         threading.Thread(target=self._do_ip_detect, daemon=True).start()
 ```
 
