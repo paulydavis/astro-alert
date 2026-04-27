@@ -87,8 +87,7 @@ def cmd_run(args) -> None:
     for r in reports:
         go_label = "GO    " if r.score.go else "NO-GO "
         drive = f"{r.drive_min}min" if r.drive_min else "home "
-        cloud_str = f"  ☁ {r.score.avg_cloud_pct}%" if r.score.avg_cloud_pct >= 0 else ""
-        print(f"  {go_label} {r.score.total:3}/100  {drive:7}  {r.site_name}{cloud_str}")
+        print(f"  {go_label} {r.score.total:3}/100  {drive:7}  {r.site_name}")
         if r.score.warnings:
             print("         " + " · ".join(r.score.warnings))
     print()

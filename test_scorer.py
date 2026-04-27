@@ -61,7 +61,7 @@ class TestWeatherScore:
     def test_clear_sky(self):
         pts, warns, _ = _weather_score(make_weather(cloud=5), bortle=7)
         assert pts == 40
-        assert not warns
+        assert any("clear" in w.lower() for w in warns)
 
     def test_partly_cloudy(self):
         pts, warns, _ = _weather_score(make_weather(cloud=30), bortle=7)
@@ -71,6 +71,7 @@ class TestWeatherScore:
     def test_overcast(self):
         pts, warns, _ = _weather_score(make_weather(cloud=90), bortle=7)
         assert pts == 0
+        assert any("overcast" in w.lower() for w in warns)
 
     def test_precipitation_zeroes_score(self):
         pts, warns, _ = _weather_score(make_weather(cloud=5, precip=1.0), bortle=7)

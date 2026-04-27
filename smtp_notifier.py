@@ -68,11 +68,10 @@ def _format_report(report: SiteReport) -> list[str]:
     moon = report.moon
     go_label = "GO" if score.go else "NO-GO"
     drive = f"{report.drive_min}min drive" if report.drive_min else "home"
-    cloud_str = f"  ☁ {score.avg_cloud_pct}% cloud" if score.avg_cloud_pct >= 0 else ""
     lines = [
         f"{report.site_name} ({drive})",
         f"  {go_label} - {score.total}/100  "
-        f"[weather {score.weather_score}/40, seeing {score.seeing_score}/30, moon {score.moon_score}/30]{cloud_str}",
+        f"[weather {score.weather_score}/40, seeing {score.seeing_score}/30, moon {score.moon_score}/30]",
     ]
     if score.warnings:
         lines.append("  " + " / ".join(score.warnings))

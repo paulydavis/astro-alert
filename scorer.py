@@ -59,17 +59,19 @@ def _weather_score(result: WeatherResult, bortle: int, target_date: Optional[dat
     cloud_weight = 1.2 if bortle <= 4 else 1.0
     if avg_cloud < 10:
         cloud_pts = 40
+        warnings.append(f"Clear ({avg_cloud:.0f}%)")
     elif avg_cloud < 25:
         cloud_pts = 32
+        warnings.append(f"Mostly clear ({avg_cloud:.0f}%)")
     elif avg_cloud < 50:
         cloud_pts = 18
-        warnings.append(f"Partly cloudy ({avg_cloud:.0f}% avg)")
+        warnings.append(f"Partly cloudy ({avg_cloud:.0f}%)")
     elif avg_cloud < 75:
         cloud_pts = 8
-        warnings.append(f"Mostly cloudy ({avg_cloud:.0f}% avg)")
+        warnings.append(f"Mostly cloudy ({avg_cloud:.0f}%)")
     else:
         cloud_pts = 0
-        warnings.append(f"Overcast ({avg_cloud:.0f}% avg)")
+        warnings.append(f"Overcast ({avg_cloud:.0f}%)")
     cloud_pts = int(min(40, cloud_pts * cloud_weight))
 
     if any_precip:
