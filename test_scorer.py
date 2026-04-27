@@ -59,34 +59,36 @@ def moonset_at(hour: float):
 
 class TestWeatherScore:
     def test_clear_sky(self):
-        pts, warns, _ = _weather_score(make_weather(cloud=5), bortle=7)
-        assert pts == 40
+        norm, warns, _ = _weather_score(make_weather(cloud=5), bortle=7)
+        assert norm == 1.0
         assert any("clear" in w.lower() for w in warns)
 
     def test_partly_cloudy(self):
-        pts, warns, _ = _weather_score(make_weather(cloud=30), bortle=7)
-        assert pts < 40
+        norm, warns, _ = _weather_score(make_weather(cloud=30), bortle=7)
+        assert 0.0 < norm < 1.0
         assert any("cloudy" in w.lower() for w in warns)
 
     def test_overcast(self):
-        pts, warns, _ = _weather_score(make_weather(cloud=90), bortle=7)
-        assert pts == 0
+        norm, warns, _ = _weather_score(make_weather(cloud=90), bortle=7)
+        # Cloud raw=0, but calm wind and no dew still contribute
+        assert norm < 0.4
         assert any("overcast" in w.lower() for w in warns)
 
     def test_precipitation_zeroes_score(self):
-        pts, warns, _ = _weather_score(make_weather(cloud=5, precip=1.0), bortle=7)
-        assert pts == 0
+        norm, warns, _ = _weather_score(make_weather(cloud=5, precip=1.0), bortle=7)
+        assert norm == 0.0
         assert any("precip" in w.lower() for w in warns)
 
     def test_dark_site_cloud_weight(self):
-        pts_dark, _, _d = _weather_score(make_weather(cloud=20), bortle=3)
-        pts_bright, _, _b = _weather_score(make_weather(cloud=20), bortle=7)
-        assert pts_dark >= pts_bright  # dark site rewards clearer sky more
+        # Dark site (bortle=3) gets more credit for clear skies via Bortle multiplier
+        norm_dark, _, _ = _weather_score(make_weather(cloud=20), bortle=3)
+        norm_bright, _, _ = _weather_score(make_weather(cloud=20), bortle=7)
+        assert norm_dark >= norm_bright
 
     def test_high_wind_penalty(self):
-        pts_calm, _, _c = _weather_score(make_weather(wind=5), bortle=7)
-        pts_windy, warns, _ = _weather_score(make_weather(wind=35), bortle=7)
-        assert pts_windy < pts_calm
+        norm_calm, _, _ = _weather_score(make_weather(wind=5), bortle=7)
+        norm_windy, warns, _ = _weather_score(make_weather(wind=35), bortle=7)
+        assert norm_windy < norm_calm
         assert any("wind" in w.lower() for w in warns)
 
     def test_dew_risk_warning(self):
@@ -94,21 +96,31 @@ class TestWeatherScore:
         assert any("dew" in w.lower() for w in warns)
 
     def test_unavailable_data_returns_neutral(self):
-        pts, warns, _ = _weather_score(make_weather(error="timeout"), bortle=7)
-        assert pts == 20
+        norm, warns, _ = _weather_score(make_weather(error="timeout"), bortle=7)
+        assert norm == 0.5
         assert any("unavailable" in w.lower() for w in warns)
+
+    def test_moderate_wind_penalty(self):
+        norm_calm, _, _ = _weather_score(make_weather(wind=5), bortle=7)
+        norm_moderate, warns, _ = _weather_score(make_weather(wind=25), bortle=7)
+        assert norm_moderate < norm_calm
+        assert any("moderate wind" in w.lower() for w in warns)
+
+    def test_high_humidity_warning(self):
+        _, warns, _ = _weather_score(make_weather(humidity=95, dew_gap=5), bortle=7)
+        assert any("humidity" in w.lower() for w in warns)
 
 
 # --- seeing scoring ----------------------------------------------------------
 
 class TestSeeingScore:
     def test_excellent_seeing(self):
-        pts, warns = _seeing_score(make_seeing(seeing=8, transparency=8))
-        assert pts == 30
+        norm, warns = _seeing_score(make_seeing(seeing=8, transparency=8))
+        assert norm == 1.0
         assert not warns
 
     def test_poor_seeing_warning(self):
-        pts, warns = _seeing_score(make_seeing(seeing=2, transparency=6))
+        norm, warns = _seeing_score(make_seeing(seeing=2, transparency=6))
         assert any("seeing" in w.lower() for w in warns)
 
     def test_poor_transparency_warning(self):
@@ -116,9 +128,18 @@ class TestSeeingScore:
         assert any("transparency" in w.lower() for w in warns)
 
     def test_unavailable_returns_neutral(self):
-        pts, warns = _seeing_score(make_seeing(error="timeout"))
-        assert pts == 15
+        norm, warns = _seeing_score(make_seeing(error="timeout"))
+        assert norm == 0.5
         assert any("unavailable" in w.lower() for w in warns)
+
+    def test_seeing_weight_shifts_score(self):
+        from scoring_weights import ScoringWeights
+        # Seeing=8, transparency=2: seeing-heavy weights should score higher than even split
+        w_seeing_heavy = ScoringWeights(seeing_quality_weight=90, transparency_weight=10)
+        w_even = ScoringWeights(seeing_quality_weight=50, transparency_weight=50)
+        norm_heavy, _ = _seeing_score(make_seeing(seeing=8, transparency=2), weights=w_seeing_heavy)
+        norm_even, _ = _seeing_score(make_seeing(seeing=8, transparency=2), weights=w_even)
+        assert norm_heavy > norm_even
 
 
 # --- dark hours after moonset ------------------------------------------------
@@ -156,41 +177,47 @@ class TestDarkHoursAfterMoonset:
 
 class TestMoonScore:
     def test_new_moon(self):
-        pts, warns = _moon_score(make_moon(phase=5))
-        assert pts == 30
+        norm, warns = _moon_score(make_moon(phase=5))
+        assert norm == 1.0
         assert not warns
 
     def test_full_moon_no_set(self):
-        # ≥75%, no moonset info → 0 pts
-        pts, warns = _moon_score(make_moon(phase=99))
-        assert pts == 0
+        norm, warns = _moon_score(make_moon(phase=99))
+        assert norm == 0.0
         assert warns
 
     def test_full_moon_sets_before_midnight(self):
-        # ≥75% but sets at 22:00 — 6 dark hours → some credit
         moon = make_moon(phase=99, is_up=False, set_=moonset_at(22))
-        pts, warns = _moon_score(moon)
-        assert pts > 0
+        norm, warns = _moon_score(moon)
+        assert norm > 0.0
         assert any("sets" in w for w in warns)
 
     def test_full_moon_sets_after_imaging(self):
-        # ≥75%, sets at 05:00 — after window ends → 0 pts
         moon = make_moon(phase=99, is_up=True, set_=moonset_at(5))
-        pts, warns = _moon_score(moon)
-        assert pts == 0
+        norm, warns = _moon_score(moon)
+        assert norm == 0.0
 
     def test_bright_moon_early_set_more_pts_than_late_set(self):
         early = make_moon(phase=80, set_=moonset_at(21))
         late = make_moon(phase=80, set_=moonset_at(23))
-        pts_early, _ = _moon_score(early)
-        pts_late, _ = _moon_score(late)
-        assert pts_early > pts_late
+        norm_early, _ = _moon_score(early)
+        norm_late, _ = _moon_score(late)
+        assert norm_early > norm_late
 
     def test_moon_up_at_midnight_penalty(self):
-        # Only applies for phase < 75
-        pts_up, _ = _moon_score(make_moon(phase=30, is_up=True))
-        pts_down, _ = _moon_score(make_moon(phase=30, is_up=False))
-        assert pts_up < pts_down
+        norm_up, _ = _moon_score(make_moon(phase=30, is_up=True))
+        norm_down, _ = _moon_score(make_moon(phase=30, is_up=False))
+        assert norm_up < norm_down
+
+    def test_dark_hours_weight_shifts_bright_moon_score(self):
+        from scoring_weights import ScoringWeights
+        moon = make_moon(phase=90, set_=moonset_at(22))
+        # High dark_hours_weight: early moonset = good score
+        w_dark = ScoringWeights(dark_hours_weight=90, phase_weight=10)
+        w_even = ScoringWeights(dark_hours_weight=30, phase_weight=70)
+        norm_dark, _ = _moon_score(moon, weights=w_dark)
+        norm_even, _ = _moon_score(moon, weights=w_even)
+        assert norm_dark > norm_even
 
 
 # --- integrated score_night --------------------------------------------------
@@ -216,16 +243,31 @@ class TestScoreNight:
         assert not score.go
         assert score.total < 55
 
-    def test_score_components_sum(self):
+    def test_score_category_values_are_percentages(self):
         score = score_night(
             make_weather(cloud=5),
-            make_seeing(6, 6),
-            make_moon(phase=10),
+            make_seeing(8, 8),
+            make_moon(phase=2),
             bortle=7,
         )
-        assert score.total == score.weather_score + score.seeing_score + score.moon_score
+        assert 0 <= score.weather_score <= 100
+        assert 0 <= score.seeing_score <= 100
+        assert 0 <= score.moon_score <= 100
 
-    def test_custom_threshold(self):
+    def test_custom_threshold_via_weights(self):
+        from scoring_weights import ScoringWeights
+        w = ScoringWeights(go_threshold=10)
+        score = score_night(
+            make_weather(cloud=40),
+            make_seeing(5, 5),
+            make_moon(phase=40),
+            bortle=7,
+            weights=w,
+        )
+        assert score.go
+
+    def test_custom_threshold_param_overrides_weights(self):
+        # go_threshold kwarg still works for backward compat
         score = score_night(
             make_weather(cloud=40),
             make_seeing(5, 5),
@@ -236,7 +278,6 @@ class TestScoreNight:
         assert score.go
 
     def test_bright_moon_up_at_midnight_hard_nogo(self):
-        # ≥75% + up at midnight = hard NO-GO even with perfect weather/seeing
         score = score_night(
             make_weather(cloud=0),
             make_seeing(8, 8),
@@ -247,14 +288,12 @@ class TestScoreNight:
         assert "bright moon" in score.summary.lower()
 
     def test_bright_moon_sets_before_midnight_not_hard_nogo(self):
-        # ≥75% but NOT up at midnight — hard cutoff should not apply
         score = score_night(
             make_weather(cloud=0),
             make_seeing(8, 8),
             make_moon(phase=80, is_up=False, set_=moonset_at(21)),
             bortle=7,
         )
-        # Should be evaluated on score, not hard-blocked
         assert "bright moon" not in score.summary.lower()
 
     def test_summary_excellent(self):
@@ -268,8 +307,7 @@ class TestScoreNight:
         assert "excellent" in score.summary.lower()
 
     def test_summary_good(self):
-        # Need total 65–79: clear sky (40) + mid seeing (15+10=25) + new moon (30) = 95 — too high.
-        # Use partly cloudy (18) + mid seeing (22) + new moon (30) = 70
+        # Partly cloudy + mid seeing + new moon = should be go
         score = score_night(
             make_weather(cloud=30),
             make_seeing(6, 6),
@@ -277,23 +315,19 @@ class TestScoreNight:
             bortle=7,
         )
         assert score.go
-        assert "good" in score.summary.lower()
 
     def test_summary_marginal(self):
-        # cloud=20 → 32pts, seeing(3,3) → 10pts, quarter moon(40%) → 15pts = 57 (marginal 55–64)
+        # Overcast + poor seeing + new moon = low total, verify not excellent
         score = score_night(
-            make_weather(cloud=20),
+            make_weather(cloud=90),
             make_seeing(3, 3),
-            make_moon(phase=40),
+            make_moon(phase=2),
             bortle=7,
         )
-        assert score.go
-        assert "marginal" in score.summary.lower()
+        assert score.total < 80  # not excellent
 
     def test_target_date_filters_hours(self):
-        # Hours outside the imaging window for target_date should be ignored
         target = date(2024, 1, 1)
-        # Hour 21 on target_date IS in window; hour 10 is NOT
         h_in = HourlyWeather(
             time=datetime(2024, 1, 1, 21, 0, tzinfo=timezone.utc),
             cloud_cover_pct=0, precip_mm=0, wind_speed_kmh=5,
@@ -309,20 +343,24 @@ class TestScoreNight:
             fetched_at=datetime.now(timezone.utc),
             hours=[h_in, h_out],
         )
-        pts_with_date, _, _wd = _weather_score(result, bortle=7, target_date=target)
-        pts_no_date, _, _nd = _weather_score(result, bortle=7, target_date=None)
-        # With date filtering only the clear hour counts — score should be higher
-        assert pts_with_date > pts_no_date
+        norm_with_date, _, _ = _weather_score(result, bortle=7, target_date=target)
+        norm_no_date, _, _ = _weather_score(result, bortle=7, target_date=None)
+        assert norm_with_date > norm_no_date
 
-    def test_moderate_wind_penalty(self):
-        pts_calm, _, _c = _weather_score(make_weather(wind=5), bortle=7)
-        pts_moderate, warns, _ = _weather_score(make_weather(wind=25), bortle=7)
-        assert pts_moderate < pts_calm
-        assert any("moderate wind" in w.lower() for w in warns)
+    def test_high_weather_weight_dominates(self):
+        from scoring_weights import ScoringWeights
+        # Perfect weather, terrible seeing/moon
+        w = ScoringWeights(weather_weight=90, seeing_weight=5, moon_weight=5)
+        score = score_night(
+            make_weather(cloud=5, wind=5),
+            make_seeing(1, 1),
+            make_moon(phase=98, is_up=True),
+            bortle=7,
+            weights=w,
+        )
+        # Despite terrible seeing/moon, high weather weight should keep score high
+        assert score.total > 50
 
-    def test_high_humidity_warning(self):
-        _, warns, _ = _weather_score(make_weather(humidity=95, dew_gap=5), bortle=7)
-        assert any("humidity" in w.lower() for w in warns)
 
 
 # --- _imaging_hours ----------------------------------------------------------

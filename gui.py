@@ -201,16 +201,19 @@ class AstroAlertApp(tk.Tk):
         self._tab_dash     = ttk.Frame(nb)
         self._tab_sites    = ttk.Frame(nb)
         self._tab_sched    = ttk.Frame(nb)
+        self._tab_scoring  = ttk.Frame(nb)
         self._tab_settings = ttk.Frame(nb)
 
         nb.add(self._tab_dash,     text="  Dashboard  ")
         nb.add(self._tab_sites,    text="  Sites  ")
         nb.add(self._tab_sched,    text="  Schedule  ")
+        nb.add(self._tab_scoring,  text="  Scoring  ")
         nb.add(self._tab_settings, text="  Settings  ")
 
         self._build_dashboard(self._tab_dash)
         self._build_sites_tab(self._tab_sites)
         self._build_schedule_tab(self._tab_sched)
+        self._build_scoring_tab(self._tab_scoring)
         self._build_settings_tab(self._tab_settings)
 
     # ── Dashboard ───────────────────────────────────────────────────────────────
@@ -559,6 +562,117 @@ class AstroAlertApp(tk.Tk):
                 self._set_status("Schedule removed.")
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
+
+    # ── Scoring tab ─────────────────────────────────────────────────────────────
+
+    def _build_scoring_tab(self, parent):
+        from scoring_weights import ScoringWeights, load_weights, save_weights
+
+        canvas = tk.Canvas(parent, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        inner = ttk.Frame(canvas)
+        _win = canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(_win, width=e.width))
+
+        def _on_mousewheel(e):
+            delta = e.delta
+            if sys.platform != "darwin":
+                delta = delta // 120
+            canvas.yview_scroll(int(-1 * delta), "units")
+        canvas.bind("<Enter>", lambda e: (
+            canvas.bind_all("<Button-4>", lambda ev: canvas.yview_scroll(-1, "units")),
+            canvas.bind_all("<Button-5>", lambda ev: canvas.yview_scroll(1, "units")),
+            canvas.bind_all("<MouseWheel>", _on_mousewheel),
+        ))
+        canvas.bind("<Leave>", lambda e: (
+            canvas.unbind_all("<Button-4>"),
+            canvas.unbind_all("<Button-5>"),
+            canvas.unbind_all("<MouseWheel>"),
+        ))
+
+        ttk.Label(inner, text="Scoring Weights",
+                  font=(FONT_PROP, 17, "bold")).pack(pady=(0, 5))
+        ttk.Label(inner,
+                  text="Adjust how each factor contributes to the go/no-go score. "
+                       "Relative values — normalized automatically.",
+                  style="Sub.TLabel").pack(pady=(0, 22))
+
+        defaults = ScoringWeights()
+        current = load_weights()
+
+        self._scoring_vars: dict[str, tk.IntVar] = {}
+        for field in vars(defaults):
+            self._scoring_vars[field] = tk.IntVar(value=getattr(current, field))
+
+        def _make_section(title, fields):
+            lf = ttk.LabelFrame(inner, text=title, padding=(16, 8))
+            lf.pack(fill="x", padx=24, pady=(0, 16))
+            lf.columnconfigure(1, weight=1)
+            for row, (label, field) in enumerate(fields):
+                var = self._scoring_vars[field]
+                ttk.Label(lf, text=label).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=4)
+                val_lbl = ttk.Label(lf, text=str(var.get()), width=4, anchor="e")
+                val_lbl.grid(row=row, column=2, padx=(8, 0), pady=4)
+
+                def _trace(name, *_, v=var, lbl=val_lbl):
+                    lbl.configure(text=str(v.get()))
+
+                var.trace_add("write", _trace)
+                ttk.Scale(
+                    lf, from_=0, to=100,
+                    orient="horizontal",
+                    variable=var,
+                    command=lambda val, v=var: v.set(int(float(val))),
+                ).grid(row=row, column=1, sticky="ew", pady=4)
+
+        _make_section("Top-Level Weights", [
+            ("Weather", "weather_weight"),
+            ("Seeing",  "seeing_weight"),
+            ("Moon",    "moon_weight"),
+        ])
+        _make_section("Weather Sub-Weights", [
+            ("Cloud Cover",    "cloud_weight"),
+            ("Wind",           "wind_weight"),
+            ("Humidity / Dew", "dew_weight"),
+        ])
+        _make_section("Seeing Sub-Weights", [
+            ("Seeing Quality", "seeing_quality_weight"),
+            ("Transparency",   "transparency_weight"),
+        ])
+        _make_section("Moon Sub-Weights", [
+            ("Moon Phase",               "phase_weight"),
+            ("Dark Hours After Moonset", "dark_hours_weight"),
+        ])
+        _make_section("GO Threshold", [
+            ("Min score to send GO alert", "go_threshold"),
+        ])
+
+        btn_row = ttk.Frame(inner)
+        btn_row.pack(fill="x", padx=24, pady=(8, 24))
+
+        self._scoring_status = tk.StringVar(value="")
+        ttk.Label(btn_row, textvariable=self._scoring_status,
+                  style="Dim.TLabel").pack(side="left")
+
+        def _reset():
+            d = ScoringWeights()
+            for field, var in self._scoring_vars.items():
+                var.set(getattr(d, field))
+            self._scoring_status.set("Reset to defaults — click Save to apply.")
+
+        def _save():
+            w = ScoringWeights(**{f: v.get() for f, v in self._scoring_vars.items()})
+            save_weights(w)
+            self._scoring_status.set("Saved.")
+            self.after(3000, lambda: self._scoring_status.set(""))
+
+        ttk.Button(btn_row, text="Reset to Defaults", command=_reset).pack(side="left", padx=(8, 0))
+        ttk.Button(btn_row, text="Save", style="Go.TButton", command=_save).pack(side="right")
 
     # ── Settings tab ────────────────────────────────────────────────────────────
 

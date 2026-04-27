@@ -121,9 +121,9 @@ class TestAppInit:
     def test_window_title(self, app):
         assert app.title() == "Astro Alert"
 
-    def test_has_notebook_with_four_tabs(self, app):
+    def test_has_notebook_with_five_tabs(self, app):
         assert hasattr(app, "_nb")
-        assert app._nb.index("end") == 4
+        assert app._nb.index("end") == 5
 
     def test_run_button_exists(self, app):
         assert hasattr(app, "_run_btn")

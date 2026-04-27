@@ -5,20 +5,21 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from moon import MoonInfo
+from scoring_weights import ScoringWeights
 from seeing import SeeingResult
 from weather import WeatherResult
 
 
 @dataclass
 class Score:
-    total: int              # 0–100
-    weather_score: int      # 0–40
-    seeing_score: int       # 0–30
-    moon_score: int         # 0–30
-    go: bool                # True if total >= threshold
+    total: int              # 0–100 weighted combined score
+    weather_score: int      # 0–100 normalized weather sub-score
+    seeing_score: int       # 0–100 normalized seeing sub-score
+    moon_score: int         # 0–100 normalized moon sub-score
+    go: bool
     summary: str
     warnings: list[str]
-    avg_cloud_pct: int = -1  # -1 = data unavailable
+    avg_cloud_pct: int = -1
 
 
 def _imaging_hours(target_date: date) -> set[datetime]:
@@ -35,12 +36,20 @@ def _imaging_hours(target_date: date) -> set[datetime]:
     return evening | early
 
 
-def _weather_score(result: WeatherResult, bortle: int, target_date: Optional[date] = None) -> tuple[int, list[str], int]:
-    """Score weather 0–40. Bortle-aware: dark sites penalize clouds more. Returns (pts, warnings, avg_cloud_pct)."""
+def _weather_score(
+    result: WeatherResult,
+    bortle: int,
+    target_date: Optional[date] = None,
+    weights: Optional[ScoringWeights] = None,
+) -> tuple[float, list[str], int]:
+    """Return (weather_norm 0–1, warnings, avg_cloud_pct)."""
+    if weights is None:
+        weights = ScoringWeights()
+
     warnings = []
     if not result.ok or not result.hours:
         warnings.append("Weather data unavailable")
-        return 20, warnings, -1
+        return 0.5, warnings, -1
 
     if target_date:
         window = _imaging_hours(target_date)
@@ -56,49 +65,74 @@ def _weather_score(result: WeatherResult, bortle: int, target_date: Optional[dat
     avg_humidity = sum(h.humidity_pct for h in night_hours) / len(night_hours)
     min_dew_gap = min(h.temp_c - h.dew_point_c for h in night_hours)
 
-    cloud_weight = 1.2 if bortle <= 4 else 1.0
+    # Cloud raw (tier-based + Bortle multiplier)
     if avg_cloud < 10:
-        cloud_pts = 40
+        cloud_raw = 1.0
         warnings.append(f"Clear ({avg_cloud:.0f}%)")
     elif avg_cloud < 25:
-        cloud_pts = 32
+        cloud_raw = 0.8
         warnings.append(f"Mostly clear ({avg_cloud:.0f}%)")
     elif avg_cloud < 50:
-        cloud_pts = 18
+        cloud_raw = 0.45
         warnings.append(f"Partly cloudy ({avg_cloud:.0f}%)")
     elif avg_cloud < 75:
-        cloud_pts = 8
+        cloud_raw = 0.2
         warnings.append(f"Mostly cloudy ({avg_cloud:.0f}%)")
     else:
-        cloud_pts = 0
+        cloud_raw = 0.0
         warnings.append(f"Overcast ({avg_cloud:.0f}%)")
-    cloud_pts = int(min(40, cloud_pts * cloud_weight))
+    cloud_raw = min(1.0, cloud_raw * (1.2 if bortle <= 4 else 1.0))
 
     if any_precip:
-        cloud_pts = 0
         warnings.append("Precipitation expected")
+        return 0.0, warnings, int(avg_cloud)
 
+    # Wind raw
     if avg_wind > 30:
-        cloud_pts = max(0, cloud_pts - 10)
+        wind_raw = 0.0
         warnings.append(f"High wind ({avg_wind:.0f} km/h avg)")
     elif avg_wind > 20:
-        cloud_pts = max(0, cloud_pts - 5)
+        wind_raw = 0.5
         warnings.append(f"Moderate wind ({avg_wind:.0f} km/h avg)")
+    else:
+        wind_raw = 1.0
 
+    # Dew/humidity raw
     if min_dew_gap < 2:
+        dew_raw = 0.0
         warnings.append(f"Dew risk: temp/dew gap only {min_dew_gap:.1f}°C")
+    elif min_dew_gap < 4:
+        dew_raw = 0.5
+    else:
+        dew_raw = 1.0
     if avg_humidity > 90:
+        dew_raw = min(dew_raw, 0.5)
         warnings.append(f"High humidity ({avg_humidity:.0f}%)")
 
-    return cloud_pts, warnings, int(avg_cloud)
+    # Combine sub-weights
+    total_w = weights.cloud_weight + weights.wind_weight + weights.dew_weight
+    weather_norm = (
+        weights.cloud_weight * cloud_raw
+        + weights.wind_weight * wind_raw
+        + weights.dew_weight * dew_raw
+    ) / total_w
+
+    return weather_norm, warnings, int(avg_cloud)
 
 
-def _seeing_score(result: SeeingResult, target_date: Optional[date] = None) -> tuple[int, list[str]]:
-    """Score seeing/transparency 0–30."""
+def _seeing_score(
+    result: SeeingResult,
+    target_date: Optional[date] = None,
+    weights: Optional[ScoringWeights] = None,
+) -> tuple[float, list[str]]:
+    """Return (seeing_norm 0–1, warnings)."""
+    if weights is None:
+        weights = ScoringWeights()
+
     warnings = []
     if not result.ok or not result.hours:
         warnings.append("Seeing data unavailable")
-        return 15, warnings
+        return 0.5, warnings
 
     if target_date:
         window = _imaging_hours(target_date)
@@ -111,15 +145,21 @@ def _seeing_score(result: SeeingResult, target_date: Optional[date] = None) -> t
     avg_seeing = sum(h.seeing for h in night_hours) / len(night_hours)
     avg_transparency = sum(h.transparency for h in night_hours) / len(night_hours)
 
-    seeing_pts = int((avg_seeing / 8) * 15)
-    transp_pts = int((avg_transparency / 8) * 15)
+    seeing_raw = avg_seeing / 8.0
+    transp_raw = avg_transparency / 8.0
 
     if avg_seeing < 3:
         warnings.append(f"Poor seeing ({avg_seeing:.1f}/8)")
     if avg_transparency < 3:
         warnings.append(f"Poor transparency ({avg_transparency:.1f}/8)")
 
-    return seeing_pts + transp_pts, warnings
+    total_w = weights.seeing_quality_weight + weights.transparency_weight
+    seeing_norm = (
+        weights.seeing_quality_weight * seeing_raw
+        + weights.transparency_weight * transp_raw
+    ) / total_w
+
+    return seeing_norm, warnings
 
 
 def _dark_hours_after_moonset(info: MoonInfo) -> float:
@@ -138,38 +178,56 @@ def _dark_hours_after_moonset(info: MoonInfo) -> float:
     return imaging_end - set_h
 
 
-def _moon_score(info: MoonInfo) -> tuple[int, list[str]]:
-    """Score moon interference 0–30 (30 = no moon impact)."""
+def _moon_score(
+    info: MoonInfo,
+    weights: Optional[ScoringWeights] = None,
+) -> tuple[float, list[str]]:
+    """Return (moon_norm 0–1, warnings)."""
+    if weights is None:
+        weights = ScoringWeights()
+
     warnings = []
     phase = info.phase_pct
 
+    # Phase raw score (tier-based)
     if phase < 10:
-        pts = 30
+        phase_raw = 1.0
     elif phase < 25:
-        pts = 24
+        phase_raw = 0.8
         warnings.append(f"Crescent moon ({phase:.0f}% illuminated)")
     elif phase < 50:
-        pts = 15
+        phase_raw = 0.5
         warnings.append(f"Quarter moon ({phase:.0f}% illuminated)")
     elif phase < 75:
-        pts = 6
+        phase_raw = 0.2
         warnings.append(f"Gibbous moon ({phase:.0f}% illuminated)")
     else:
-        # Bright moon (≥75%): score by how many dark hours remain after moonset
+        phase_raw = 0.0
         dark_hrs = _dark_hours_after_moonset(info)
-        # Scale: 8 dark hours = 12 pts, 0 = 0 pts
-        pts = int((dark_hrs / 8.0) * 12)
         if dark_hrs >= 4:
             set_str = info.set_utc.strftime("%H:%MZ") if info.set_utc else "?"
             warnings.append(f"Bright moon ({phase:.0f}%) sets {set_str} — image after moonset")
         else:
             warnings.append(f"Bright moon ({phase:.0f}% illuminated)")
 
-    if info.is_up_at_midnight and phase > 20 and phase < 75:
-        pts = max(0, pts - 5)
+    # Up-at-midnight penalty (crescent/quarter/gibbous only)
+    if info.is_up_at_midnight and 20 < phase < 75:
+        phase_raw = max(0.0, phase_raw - 5 / 30)
         warnings.append("Moon up at midnight")
 
-    return pts, warnings
+    # Dark hours raw: actual dark hours for bright moon; mirrors phase_raw for dim moons
+    if phase >= 75:
+        dark_hours_raw = _dark_hours_after_moonset(info) / 8.0
+    else:
+        dark_hours_raw = phase_raw  # dim moons: no separate dark-hours constraint
+
+    total_w = weights.phase_weight + weights.dark_hours_weight
+    moon_norm = (
+        weights.phase_weight * phase_raw
+        + weights.dark_hours_weight * dark_hours_raw
+    ) / total_w
+
+    return moon_norm, warnings
 
 
 def score_night(
@@ -178,21 +236,30 @@ def score_night(
     moon: MoonInfo,
     bortle: int,
     target_date: Optional[date] = None,
-    go_threshold: int = 55,
+    go_threshold: Optional[int] = None,
+    weights: Optional[ScoringWeights] = None,
 ) -> Score:
-    w_pts, w_warn, avg_cloud = _weather_score(weather, bortle, target_date)
-    s_pts, s_warn = _seeing_score(seeing, target_date)
-    m_pts, m_warn = _moon_score(moon)
+    if weights is None:
+        weights = ScoringWeights()
+    threshold = go_threshold if go_threshold is not None else weights.go_threshold
 
-    total = w_pts + s_pts + m_pts
+    w_norm, w_warn, avg_cloud = _weather_score(weather, bortle, target_date, weights)
+    s_norm, s_warn = _seeing_score(seeing, target_date, weights)
+    m_norm, m_warn = _moon_score(moon, weights)
+
+    total_w = weights.weather_weight + weights.seeing_weight + weights.moon_weight
+    total = int(
+        (weights.weather_weight * w_norm + weights.seeing_weight * s_norm + weights.moon_weight * m_norm)
+        / total_w * 100
+    )
+
     all_warnings = w_warn + s_warn + m_warn
-    # Hard cutoff: bright moon that's still up at midnight ruins the whole night
     moon_kills_night = moon.phase_pct >= 75 and moon.is_up_at_midnight
 
     if moon_kills_night:
         go = False
         summary = f"No-go — bright moon ({moon.phase_pct:.0f}%) up all night."
-    elif total >= go_threshold:
+    elif total >= threshold:
         go = True
         if total >= 80:
             summary = "Excellent night — go image."
@@ -206,9 +273,9 @@ def score_night(
 
     return Score(
         total=total,
-        weather_score=w_pts,
-        seeing_score=s_pts,
-        moon_score=m_pts,
+        weather_score=int(w_norm * 100),
+        seeing_score=int(s_norm * 100),
+        moon_score=int(m_norm * 100),
         go=go,
         summary=summary,
         warnings=all_warnings,

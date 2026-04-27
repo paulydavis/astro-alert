@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from smtp_notifier import SiteReport, send_multi_site_alert
 from moon import get_moon_info
 from scorer import score_night
+from scoring_weights import load_weights
 from seeing import fetch_seeing
 from site_manager import add_site, get_active_site, list_sites
 from weather import fetch_weather
@@ -41,10 +42,11 @@ def cmd_add_site(args) -> None:
 
 
 def _fetch_report(site, target_date) -> SiteReport:
+    weights = load_weights()
     weather = fetch_weather(site.key, site.lat, site.lon, target_date=target_date)
     seeing = fetch_seeing(site.key, site.lat, site.lon)
     moon = get_moon_info(site.lat, site.lon, target_date=target_date)
-    score = score_night(weather, seeing, moon, bortle=site.bortle, target_date=target_date)
+    score = score_night(weather, seeing, moon, bortle=site.bortle, target_date=target_date, weights=weights)
     return SiteReport(site_name=site.name, drive_min=site.drive_min, score=score, moon=moon)
 
 
