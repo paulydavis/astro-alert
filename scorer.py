@@ -1,10 +1,12 @@
 """Score a night's imaging conditions and produce a go/no-go recommendation."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from moon import MoonInfo
+from scoring_weights import ScoringWeights
 from seeing import SeeingResult
 from weather import WeatherResult
 
@@ -35,12 +37,20 @@ def _imaging_hours(target_date: date) -> set[datetime]:
     return evening | early
 
 
-def _weather_score(result: WeatherResult, bortle: int, target_date: Optional[date] = None) -> tuple[int, list[str], int]:
-    """Score weather 0–40. Bortle-aware: dark sites penalize clouds more. Returns (pts, warnings, avg_cloud_pct)."""
+def _weather_score(
+    result: WeatherResult,
+    bortle: int,
+    target_date: Optional[date] = None,
+    weights: Optional[ScoringWeights] = None,
+) -> tuple[float, list[str], int]:
+    """Return (weather_norm 0–1, warnings, avg_cloud_pct)."""
+    if weights is None:
+        weights = ScoringWeights()
+
     warnings = []
     if not result.ok or not result.hours:
         warnings.append("Weather data unavailable")
-        return 20, warnings, -1
+        return 0.5, warnings, -1
 
     if target_date:
         window = _imaging_hours(target_date)
@@ -56,41 +66,60 @@ def _weather_score(result: WeatherResult, bortle: int, target_date: Optional[dat
     avg_humidity = sum(h.humidity_pct for h in night_hours) / len(night_hours)
     min_dew_gap = min(h.temp_c - h.dew_point_c for h in night_hours)
 
-    cloud_weight = 1.2 if bortle <= 4 else 1.0
+    # Cloud raw (tier-based + Bortle multiplier)
     if avg_cloud < 10:
-        cloud_pts = 40
+        cloud_raw = 1.0
         warnings.append(f"Clear ({avg_cloud:.0f}%)")
     elif avg_cloud < 25:
-        cloud_pts = 32
+        cloud_raw = 0.8
         warnings.append(f"Mostly clear ({avg_cloud:.0f}%)")
     elif avg_cloud < 50:
-        cloud_pts = 18
+        cloud_raw = 0.45
         warnings.append(f"Partly cloudy ({avg_cloud:.0f}%)")
     elif avg_cloud < 75:
-        cloud_pts = 8
+        cloud_raw = 0.2
         warnings.append(f"Mostly cloudy ({avg_cloud:.0f}%)")
     else:
-        cloud_pts = 0
+        cloud_raw = 0.0
         warnings.append(f"Overcast ({avg_cloud:.0f}%)")
-    cloud_pts = int(min(40, cloud_pts * cloud_weight))
+    cloud_raw = min(1.0, cloud_raw * (1.2 if bortle <= 4 else 1.0))
 
-    if any_precip:
-        cloud_pts = 0
-        warnings.append("Precipitation expected")
-
+    # Wind raw
     if avg_wind > 30:
-        cloud_pts = max(0, cloud_pts - 10)
+        wind_raw = 0.0
         warnings.append(f"High wind ({avg_wind:.0f} km/h avg)")
     elif avg_wind > 20:
-        cloud_pts = max(0, cloud_pts - 5)
+        wind_raw = 0.5
         warnings.append(f"Moderate wind ({avg_wind:.0f} km/h avg)")
+    else:
+        wind_raw = 1.0
 
+    # Dew/humidity raw
     if min_dew_gap < 2:
+        dew_raw = 0.0
         warnings.append(f"Dew risk: temp/dew gap only {min_dew_gap:.1f}°C")
+    elif min_dew_gap < 4:
+        dew_raw = 0.5
+    else:
+        dew_raw = 1.0
     if avg_humidity > 90:
+        dew_raw = min(dew_raw, 0.5)
         warnings.append(f"High humidity ({avg_humidity:.0f}%)")
 
-    return cloud_pts, warnings, int(avg_cloud)
+    # Combine sub-weights
+    total_w = weights.cloud_weight + weights.wind_weight + weights.dew_weight
+    weather_norm = (
+        weights.cloud_weight * cloud_raw
+        + weights.wind_weight * wind_raw
+        + weights.dew_weight * dew_raw
+    ) / total_w
+
+    # Precipitation overrides everything
+    if any_precip:
+        weather_norm = 0.0
+        warnings.append("Precipitation expected")
+
+    return weather_norm, warnings, int(avg_cloud)
 
 
 def _seeing_score(result: SeeingResult, target_date: Optional[date] = None) -> tuple[int, list[str]]:

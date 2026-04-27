@@ -59,34 +59,36 @@ def moonset_at(hour: float):
 
 class TestWeatherScore:
     def test_clear_sky(self):
-        pts, warns, _ = _weather_score(make_weather(cloud=5), bortle=7)
-        assert pts == 40
+        norm, warns, _ = _weather_score(make_weather(cloud=5), bortle=7)
+        assert norm == 1.0
         assert any("clear" in w.lower() for w in warns)
 
     def test_partly_cloudy(self):
-        pts, warns, _ = _weather_score(make_weather(cloud=30), bortle=7)
-        assert pts < 40
+        norm, warns, _ = _weather_score(make_weather(cloud=30), bortle=7)
+        assert 0.0 < norm < 1.0
         assert any("cloudy" in w.lower() for w in warns)
 
     def test_overcast(self):
-        pts, warns, _ = _weather_score(make_weather(cloud=90), bortle=7)
-        assert pts == 0
+        norm, warns, _ = _weather_score(make_weather(cloud=90), bortle=7)
+        # Cloud raw=0, but calm wind and no dew still contribute
+        assert norm < 0.4
         assert any("overcast" in w.lower() for w in warns)
 
     def test_precipitation_zeroes_score(self):
-        pts, warns, _ = _weather_score(make_weather(cloud=5, precip=1.0), bortle=7)
-        assert pts == 0
+        norm, warns, _ = _weather_score(make_weather(cloud=5, precip=1.0), bortle=7)
+        assert norm == 0.0
         assert any("precip" in w.lower() for w in warns)
 
     def test_dark_site_cloud_weight(self):
-        pts_dark, _, _d = _weather_score(make_weather(cloud=20), bortle=3)
-        pts_bright, _, _b = _weather_score(make_weather(cloud=20), bortle=7)
-        assert pts_dark >= pts_bright  # dark site rewards clearer sky more
+        # Dark site (bortle=3) gets more credit for clear skies via Bortle multiplier
+        norm_dark, _, _ = _weather_score(make_weather(cloud=20), bortle=3)
+        norm_bright, _, _ = _weather_score(make_weather(cloud=20), bortle=7)
+        assert norm_dark >= norm_bright
 
     def test_high_wind_penalty(self):
-        pts_calm, _, _c = _weather_score(make_weather(wind=5), bortle=7)
-        pts_windy, warns, _ = _weather_score(make_weather(wind=35), bortle=7)
-        assert pts_windy < pts_calm
+        norm_calm, _, _ = _weather_score(make_weather(wind=5), bortle=7)
+        norm_windy, warns, _ = _weather_score(make_weather(wind=35), bortle=7)
+        assert norm_windy < norm_calm
         assert any("wind" in w.lower() for w in warns)
 
     def test_dew_risk_warning(self):
@@ -94,9 +96,19 @@ class TestWeatherScore:
         assert any("dew" in w.lower() for w in warns)
 
     def test_unavailable_data_returns_neutral(self):
-        pts, warns, _ = _weather_score(make_weather(error="timeout"), bortle=7)
-        assert pts == 20
+        norm, warns, _ = _weather_score(make_weather(error="timeout"), bortle=7)
+        assert norm == 0.5
         assert any("unavailable" in w.lower() for w in warns)
+
+    def test_moderate_wind_penalty(self):
+        norm_calm, _, _ = _weather_score(make_weather(wind=5), bortle=7)
+        norm_moderate, warns, _ = _weather_score(make_weather(wind=25), bortle=7)
+        assert norm_moderate < norm_calm
+        assert any("moderate wind" in w.lower() for w in warns)
+
+    def test_high_humidity_warning(self):
+        _, warns, _ = _weather_score(make_weather(humidity=95, dew_gap=5), bortle=7)
+        assert any("humidity" in w.lower() for w in warns)
 
 
 # --- seeing scoring ----------------------------------------------------------
@@ -291,9 +303,7 @@ class TestScoreNight:
         assert "marginal" in score.summary.lower()
 
     def test_target_date_filters_hours(self):
-        # Hours outside the imaging window for target_date should be ignored
         target = date(2024, 1, 1)
-        # Hour 21 on target_date IS in window; hour 10 is NOT
         h_in = HourlyWeather(
             time=datetime(2024, 1, 1, 21, 0, tzinfo=timezone.utc),
             cloud_cover_pct=0, precip_mm=0, wind_speed_kmh=5,
@@ -309,20 +319,10 @@ class TestScoreNight:
             fetched_at=datetime.now(timezone.utc),
             hours=[h_in, h_out],
         )
-        pts_with_date, _, _wd = _weather_score(result, bortle=7, target_date=target)
-        pts_no_date, _, _nd = _weather_score(result, bortle=7, target_date=None)
-        # With date filtering only the clear hour counts — score should be higher
-        assert pts_with_date > pts_no_date
+        norm_with_date, _, _ = _weather_score(result, bortle=7, target_date=target)
+        norm_no_date, _, _ = _weather_score(result, bortle=7, target_date=None)
+        assert norm_with_date > norm_no_date
 
-    def test_moderate_wind_penalty(self):
-        pts_calm, _, _c = _weather_score(make_weather(wind=5), bortle=7)
-        pts_moderate, warns, _ = _weather_score(make_weather(wind=25), bortle=7)
-        assert pts_moderate < pts_calm
-        assert any("moderate wind" in w.lower() for w in warns)
-
-    def test_high_humidity_warning(self):
-        _, warns, _ = _weather_score(make_weather(humidity=95, dew_gap=5), bortle=7)
-        assert any("humidity" in w.lower() for w in warns)
 
 
 # --- _imaging_hours ----------------------------------------------------------
