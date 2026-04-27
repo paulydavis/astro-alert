@@ -1,5 +1,4 @@
 """Score a night's imaging conditions and produce a go/no-go recommendation."""
-from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -84,6 +83,10 @@ def _weather_score(
         warnings.append(f"Overcast ({avg_cloud:.0f}%)")
     cloud_raw = min(1.0, cloud_raw * (1.2 if bortle <= 4 else 1.0))
 
+    if any_precip:
+        warnings.append("Precipitation expected")
+        return 0.0, warnings, int(avg_cloud)
+
     # Wind raw
     if avg_wind > 30:
         wind_raw = 0.0
@@ -113,11 +116,6 @@ def _weather_score(
         + weights.wind_weight * wind_raw
         + weights.dew_weight * dew_raw
     ) / total_w
-
-    # Precipitation overrides everything
-    if any_precip:
-        weather_norm = 0.0
-        warnings.append("Precipitation expected")
 
     return weather_norm, warnings, int(avg_cloud)
 
