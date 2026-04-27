@@ -682,11 +682,12 @@ class AstroAlertApp(tk.Tk):
                       width=18).grid(row=row_idx, column=1, sticky="w", pady=6)
 
         home_btn_row = ttk.Frame(inner)
-        home_btn_row.pack(pady=(14, 0))
+        home_btn_row.pack(pady=(14, 24))
         ttk.Button(home_btn_row, text="Save Home Location", style="Accent.TButton",
                    command=self._save_home_location).pack()
 
         self.after(50, self._load_credentials_to_form)
+        self.after(100, lambda: canvas.configure(scrollregion=canvas.bbox("all")))
 
     def _load_credentials_to_form(self):
         from data_dir import ENV_FILE
