@@ -904,8 +904,9 @@ class SiteDialog(tk.Toplevel):
         super().__init__(parent)
         self.title(title)
         self.configure(bg=BG)
-        self.geometry("520x680")
-        self.resizable(False, False)
+        self.geometry("520x660")
+        self.minsize(520, 480)
+        self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
         self.result       = None
@@ -914,12 +915,48 @@ class SiteDialog(tk.Toplevel):
         self._build(site, key)
 
     def _build(self, site, key):
-        ttk.Label(self, text=self.title(),
+        # ── Fixed footer (packed first so it's always visible) ─────────────────
+        footer = ttk.Frame(self)
+        footer.pack(side="bottom", fill="x")
+        ttk.Separator(footer).pack(fill="x")
+        btns = ttk.Frame(footer)
+        btns.pack(pady=12)
+        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=(0, 14))
+        ttk.Button(btns, text="Save", style="Accent.TButton",
+                   command=self._save).pack(side="left")
+
+        # ── Scrollable body ────────────────────────────────────────────────────
+        canvas = tk.Canvas(self, highlightthickness=0, bg=BG)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        inner = ttk.Frame(canvas)
+        _win = canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(_win, width=e.width))
+
+        def _on_mousewheel(e):
+            delta = e.delta
+            if sys.platform != "darwin":
+                delta = delta // 120
+            canvas.yview_scroll(int(-1 * delta), "units")
+
+        canvas.bind("<Enter>", lambda _: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda _: canvas.unbind_all("<MouseWheel>"))
+        if sys.platform == "linux":
+            canvas.bind("<Enter>", lambda _: (
+                canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units")),
+                canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units")),
+            ))
+
+        ttk.Label(inner, text=self.title(),
                   font=(FONT_PROP, 15, "bold")).pack(pady=(20, 0))
-        ttk.Separator(self).pack(fill="x", padx=30, pady=12)
+        ttk.Separator(inner).pack(fill="x", padx=30, pady=12)
 
         # ── Location search ────────────────────────────────────────────────────
-        sf = ttk.Frame(self)
+        sf = ttk.Frame(inner)
         sf.pack(padx=36, fill="x")
         sf.columnconfigure(0, weight=1)
 
@@ -941,7 +978,7 @@ class SiteDialog(tk.Toplevel):
         self._results_combo.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 0))
         self._results_combo.bind("<<ComboboxSelected>>", self._on_result_selected)
 
-        ttk.Separator(self).pack(fill="x", padx=30, pady=12)
+        ttk.Separator(inner).pack(fill="x", padx=30, pady=12)
 
         # ── Fields grid ────────────────────────────────────────────────────────
         defaults = {
@@ -956,7 +993,7 @@ class SiteDialog(tk.Toplevel):
             "notes":       getattr(site, "notes", "") or "",
         }
 
-        grid = ttk.Frame(self)
+        grid = ttk.Frame(inner)
         grid.pack(padx=36, fill="x")
         grid.columnconfigure(1, weight=1)
 
@@ -980,18 +1017,10 @@ class SiteDialog(tk.Toplevel):
                            command=self._open_bortle_map).grid(
                     row=row_idx, column=2, padx=(8, 0), pady=5)
 
-        # ── Footer ─────────────────────────────────────────────────────────────
+        # ── Active-site checkbox ───────────────────────────────────────────────
         self._set_active_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self, text="Set as active site",
-                         variable=self._set_active_var).pack(pady=(10, 0))
-
-        ttk.Separator(self).pack(fill="x", padx=30, pady=12)
-
-        btns = ttk.Frame(self)
-        btns.pack(pady=(0, 20))
-        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=(0, 14))
-        ttk.Button(btns, text="Save", style="Accent.TButton",
-                   command=self._save).pack(side="left")
+        ttk.Checkbutton(inner, text="Set as active site",
+                         variable=self._set_active_var).pack(pady=(10, 20))
 
     # ── Geocoding ──────────────────────────────────────────────────────────────
 
