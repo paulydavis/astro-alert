@@ -18,6 +18,7 @@ class Score:
     go: bool                # True if total >= threshold
     summary: str
     warnings: list[str]
+    avg_cloud_pct: int = -1  # -1 = data unavailable
 
 
 def _imaging_hours(target_date: date) -> set[datetime]:
@@ -34,12 +35,12 @@ def _imaging_hours(target_date: date) -> set[datetime]:
     return evening | early
 
 
-def _weather_score(result: WeatherResult, bortle: int, target_date: Optional[date] = None) -> tuple[int, list[str]]:
-    """Score weather 0–40. Bortle-aware: dark sites penalize clouds more."""
+def _weather_score(result: WeatherResult, bortle: int, target_date: Optional[date] = None) -> tuple[int, list[str], int]:
+    """Score weather 0–40. Bortle-aware: dark sites penalize clouds more. Returns (pts, warnings, avg_cloud_pct)."""
     warnings = []
     if not result.ok or not result.hours:
         warnings.append("Weather data unavailable")
-        return 20, warnings
+        return 20, warnings, -1
 
     if target_date:
         window = _imaging_hours(target_date)
@@ -87,7 +88,7 @@ def _weather_score(result: WeatherResult, bortle: int, target_date: Optional[dat
     if avg_humidity > 90:
         warnings.append(f"High humidity ({avg_humidity:.0f}%)")
 
-    return cloud_pts, warnings
+    return cloud_pts, warnings, int(avg_cloud)
 
 
 def _seeing_score(result: SeeingResult, target_date: Optional[date] = None) -> tuple[int, list[str]]:
@@ -177,7 +178,7 @@ def score_night(
     target_date: Optional[date] = None,
     go_threshold: int = 55,
 ) -> Score:
-    w_pts, w_warn = _weather_score(weather, bortle, target_date)
+    w_pts, w_warn, avg_cloud = _weather_score(weather, bortle, target_date)
     s_pts, s_warn = _seeing_score(seeing, target_date)
     m_pts, m_warn = _moon_score(moon)
 
@@ -209,4 +210,5 @@ def score_night(
         go=go,
         summary=summary,
         warnings=all_warnings,
+        avg_cloud_pct=avg_cloud,
     )
