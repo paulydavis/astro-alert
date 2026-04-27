@@ -167,3 +167,97 @@ def build_chart_data(site, hours: int = 72) -> ChartData:
         moon_events=moon_events,
         errors=errors,
     )
+
+
+# ── Row definitions for HTML table ───────────────────────────────────────────
+
+_ROWS = [
+    ("Cloud Cover",  "cloud",         cloud_color,         lambda v: f"{v}%"),
+    ("Seeing",       "seeing",        seeing_color,        lambda v: f"{v:.0f}/8"),
+    ("Transparency", "transparency",  transparency_color,  lambda v: f"{v:.0f}/8"),
+    ("Wind",         "wind",          wind_color,          lambda v: f"{v:.0f} km/h"),
+    ("Humidity",     "humidity",      humidity_color,      lambda v: f"{v}%"),
+    ("Temperature",  "temperature",   temperature_color,   lambda v: f"{v:.1f}°C"),
+    ("Precip",       "precipitation", precipitation_color, lambda v: f"{v:.1f} mm"),
+    ("Moon",         "moon_pct",      moon_color,          lambda v: f"{v}%"),
+]
+
+_CELL_W  = 18
+_CELL_H  = 24
+_LABEL_W = 120
+
+
+def render_html(data: ChartData) -> str:
+    """Return a complete HTML document containing the 72-hour forecast table."""
+    hours = len(data.cloud)
+    num_days = (hours + 23) // 24
+
+    lines = [
+        "<!DOCTYPE html>",
+        '<html><head><meta charset="utf-8">',
+        f"<title>Astro Chart — {data.site_name}</title>",
+        "</head>",
+        '<body style="background:#0d1117;color:#c9d1d9;font-family:monospace">',
+        f'<h2 style="margin:16px 0 8px">{data.site_name} — 72-Hour Forecast</h2>',
+        '<table style="border-collapse:collapse;font-size:10px">',
+    ]
+
+    # ── Date header row ──────────────────────────────────────────────────────
+    lines.append("<tr>")
+    lines.append(f'<td style="width:{_LABEL_W}px"></td>')
+    for day in range(num_days):
+        dt = data.start_dt + timedelta(hours=day * 24)
+        label = dt.strftime("%a %b %-d")
+        lines.append(
+            f'<td colspan="24" style="text-align:center;font-weight:bold;'
+            f'padding:2px 0;color:#58a6ff">{label}</td>'
+        )
+    lines.append("</tr>")
+
+    # ── Hour labels row ──────────────────────────────────────────────────────
+    lines.append("<tr>")
+    lines.append(f'<td style="width:{_LABEL_W}px"></td>')
+    for i in range(hours):
+        h = i % 24
+        lines.append(
+            f'<td style="width:{_CELL_W}px;text-align:center;'
+            f'color:#8b949e;font-size:9px">{h:02d}</td>'
+        )
+    lines.append("</tr>")
+
+    # ── Data rows ────────────────────────────────────────────────────────────
+    for label, field_name, color_fn, fmt_fn in _ROWS:
+        values = getattr(data, field_name)
+        lines.append("<tr>")
+        lines.append(
+            f'<td style="padding-right:8px;white-space:nowrap;'
+            f'font-size:11px;color:#c9d1d9">{label}</td>'
+        )
+        for i, val in enumerate(values):
+            if val is None:
+                bg    = _MISSING
+                title = "N/A"
+                text  = ""
+            else:
+                bg    = color_fn(val)
+                title = fmt_fn(val)
+                text  = ""
+
+            if field_name == "moon_pct" and i in data.moon_events:
+                text = "▲" if data.moon_events[i] == "rise" else "▼"
+
+            cell_style = (
+                f"background:{bg};width:{_CELL_W}px;height:{_CELL_H}px;"
+                f"text-align:center;font-size:9px;color:#fff"
+            )
+            lines.append(f'<td title="{title}" style="{cell_style}">{text}</td>')
+        lines.append("</tr>")
+
+    lines += ["</table>"]
+
+    if data.errors:
+        err_html = "<br>".join(data.errors)
+        lines.append(f'<p style="color:#e3b341;font-size:11px">⚠ Data gaps: {err_html}</p>')
+
+    lines += ["</body></html>"]
+    return "\n".join(lines)

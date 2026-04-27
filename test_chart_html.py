@@ -118,3 +118,57 @@ def test_build_chart_data_returns_72_entries():
     assert len(data.moon_pct) == 72
     assert data.cloud[0] == 20
     assert data.errors == []
+
+
+def test_render_html_structure():
+    """render_html produces a valid HTML table with correct column count."""
+    from datetime import datetime, timezone
+    from chart_html import ChartData, render_html
+
+    data = ChartData(
+        site_name="Test Site",
+        start_dt=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        cloud=[20] * 72,
+        seeing=[6.0] * 72,
+        transparency=[6.0] * 72,
+        wind=[10.0] * 72,
+        humidity=[50] * 72,
+        temperature=[15.0] * 72,
+        precipitation=[0.0] * 72,
+        moon_pct=[30] * 72,
+        moon_events={5: "rise", 18: "set"},
+        errors=[],
+    )
+    html = render_html(data)
+
+    assert "<table" in html
+    assert "Test Site" in html
+    assert html.count("<td") >= 576
+    assert "stylesheet" not in html
+    assert "<link" not in html
+    assert "▲" in html
+    assert "▼" in html
+
+
+def test_render_html_missing_values():
+    """render_html handles None values (missing data) without raising."""
+    from datetime import datetime, timezone
+    from chart_html import ChartData, render_html
+
+    data = ChartData(
+        site_name="Test",
+        start_dt=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        cloud=[None] * 72,
+        seeing=[None] * 72,
+        transparency=[None] * 72,
+        wind=[None] * 72,
+        humidity=[None] * 72,
+        temperature=[None] * 72,
+        precipitation=[None] * 72,
+        moon_pct=[0] * 72,
+        moon_events={},
+        errors=["Weather: timeout"],
+    )
+    html = render_html(data)
+    assert "<table" in html
+    assert "#444444" in html  # missing cell color
