@@ -2,7 +2,7 @@
 
 import json
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -196,12 +196,12 @@ class TestCmdRun:
             captured_dates.append(target_date)
             return make_nogo_report(site.name, site.drive_min)
 
-        today = datetime.now(timezone.utc).date()
+        now_utc = datetime.now(timezone.utc)
+        today = now_utc.date() if now_utc.hour >= 12 else (now_utc - timedelta(days=1)).date()
         args = build_parser().parse_args(["--tomorrow", "--dry-run"])
         with patch("astro_alert._fetch_report", side_effect=capture_fetch):
             cmd_run(args)
 
-        from datetime import timedelta
         assert all(d == today + timedelta(days=1) for d in captured_dates)
 
     def test_single_site_via_flag(self, tmp_path, monkeypatch, capsys):

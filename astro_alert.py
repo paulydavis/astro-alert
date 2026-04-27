@@ -49,7 +49,9 @@ def _fetch_report(site, target_date) -> SiteReport:
 
 
 def cmd_run(args) -> None:
-    today = datetime.now(timezone.utc).date()
+    now_utc = datetime.now(timezone.utc)
+    # Noon UTC ≈ 8 AM Eastern — anything before that is still "last night" locally.
+    today = now_utc.date() if now_utc.hour >= 12 else (now_utc - timedelta(days=1)).date()
     target_date = today + timedelta(days=1) if args.tomorrow else today
     night_label = "tomorrow night" if args.tomorrow else "tonight"
 
