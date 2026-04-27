@@ -178,38 +178,56 @@ def _dark_hours_after_moonset(info: MoonInfo) -> float:
     return imaging_end - set_h
 
 
-def _moon_score(info: MoonInfo) -> tuple[int, list[str]]:
-    """Score moon interference 0–30 (30 = no moon impact)."""
+def _moon_score(
+    info: MoonInfo,
+    weights: Optional[ScoringWeights] = None,
+) -> tuple[float, list[str]]:
+    """Return (moon_norm 0–1, warnings)."""
+    if weights is None:
+        weights = ScoringWeights()
+
     warnings = []
     phase = info.phase_pct
 
+    # Phase raw score (tier-based)
     if phase < 10:
-        pts = 30
+        phase_raw = 1.0
     elif phase < 25:
-        pts = 24
+        phase_raw = 0.8
         warnings.append(f"Crescent moon ({phase:.0f}% illuminated)")
     elif phase < 50:
-        pts = 15
+        phase_raw = 0.5
         warnings.append(f"Quarter moon ({phase:.0f}% illuminated)")
     elif phase < 75:
-        pts = 6
+        phase_raw = 0.2
         warnings.append(f"Gibbous moon ({phase:.0f}% illuminated)")
     else:
-        # Bright moon (≥75%): score by how many dark hours remain after moonset
+        phase_raw = 0.0
         dark_hrs = _dark_hours_after_moonset(info)
-        # Scale: 8 dark hours = 12 pts, 0 = 0 pts
-        pts = int((dark_hrs / 8.0) * 12)
         if dark_hrs >= 4:
             set_str = info.set_utc.strftime("%H:%MZ") if info.set_utc else "?"
             warnings.append(f"Bright moon ({phase:.0f}%) sets {set_str} — image after moonset")
         else:
             warnings.append(f"Bright moon ({phase:.0f}% illuminated)")
 
-    if info.is_up_at_midnight and phase > 20 and phase < 75:
-        pts = max(0, pts - 5)
+    # Up-at-midnight penalty (crescent/quarter/gibbous only)
+    if info.is_up_at_midnight and 20 < phase < 75:
+        phase_raw = max(0.0, phase_raw - 5 / 30)
         warnings.append("Moon up at midnight")
 
-    return pts, warnings
+    # Dark hours raw: actual dark hours for bright moon; mirrors phase_raw for dim moons
+    if phase >= 75:
+        dark_hours_raw = _dark_hours_after_moonset(info) / 8.0
+    else:
+        dark_hours_raw = phase_raw  # dim moons: no separate dark-hours constraint
+
+    total_w = weights.phase_weight + weights.dark_hours_weight
+    moon_norm = (
+        weights.phase_weight * phase_raw
+        + weights.dark_hours_weight * dark_hours_raw
+    ) / total_w
+
+    return moon_norm, warnings
 
 
 def score_night(
@@ -222,11 +240,13 @@ def score_night(
 ) -> Score:
     w_norm, w_warn, avg_cloud = _weather_score(weather, bortle, target_date)
     s_norm, s_warn = _seeing_score(seeing, target_date)
-    m_pts, m_warn = _moon_score(moon)
+    m_norm, m_warn = _moon_score(moon)
 
     # Convert normalized floats (0–1) back to integer scores for compatibility
     w_pts = int(w_norm * 40)
     s_pts = int(s_norm * 30)
+    # temporary shim — Task 5 will replace with proper normalized formula
+    m_pts = int(m_norm * 30)
 
     total = w_pts + s_pts + m_pts
     all_warnings = w_warn + s_warn + m_warn

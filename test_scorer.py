@@ -177,41 +177,47 @@ class TestDarkHoursAfterMoonset:
 
 class TestMoonScore:
     def test_new_moon(self):
-        pts, warns = _moon_score(make_moon(phase=5))
-        assert pts == 30
+        norm, warns = _moon_score(make_moon(phase=5))
+        assert norm == 1.0
         assert not warns
 
     def test_full_moon_no_set(self):
-        # ≥75%, no moonset info → 0 pts
-        pts, warns = _moon_score(make_moon(phase=99))
-        assert pts == 0
+        norm, warns = _moon_score(make_moon(phase=99))
+        assert norm == 0.0
         assert warns
 
     def test_full_moon_sets_before_midnight(self):
-        # ≥75% but sets at 22:00 — 6 dark hours → some credit
         moon = make_moon(phase=99, is_up=False, set_=moonset_at(22))
-        pts, warns = _moon_score(moon)
-        assert pts > 0
+        norm, warns = _moon_score(moon)
+        assert norm > 0.0
         assert any("sets" in w for w in warns)
 
     def test_full_moon_sets_after_imaging(self):
-        # ≥75%, sets at 05:00 — after window ends → 0 pts
         moon = make_moon(phase=99, is_up=True, set_=moonset_at(5))
-        pts, warns = _moon_score(moon)
-        assert pts == 0
+        norm, warns = _moon_score(moon)
+        assert norm == 0.0
 
     def test_bright_moon_early_set_more_pts_than_late_set(self):
         early = make_moon(phase=80, set_=moonset_at(21))
         late = make_moon(phase=80, set_=moonset_at(23))
-        pts_early, _ = _moon_score(early)
-        pts_late, _ = _moon_score(late)
-        assert pts_early > pts_late
+        norm_early, _ = _moon_score(early)
+        norm_late, _ = _moon_score(late)
+        assert norm_early > norm_late
 
     def test_moon_up_at_midnight_penalty(self):
-        # Only applies for phase < 75
-        pts_up, _ = _moon_score(make_moon(phase=30, is_up=True))
-        pts_down, _ = _moon_score(make_moon(phase=30, is_up=False))
-        assert pts_up < pts_down
+        norm_up, _ = _moon_score(make_moon(phase=30, is_up=True))
+        norm_down, _ = _moon_score(make_moon(phase=30, is_up=False))
+        assert norm_up < norm_down
+
+    def test_dark_hours_weight_shifts_bright_moon_score(self):
+        from scoring_weights import ScoringWeights
+        moon = make_moon(phase=90, set_=moonset_at(22))
+        # High dark_hours_weight: early moonset = good score
+        w_dark = ScoringWeights(dark_hours_weight=90, phase_weight=10)
+        w_even = ScoringWeights(dark_hours_weight=30, phase_weight=70)
+        norm_dark, _ = _moon_score(moon, weights=w_dark)
+        norm_even, _ = _moon_score(moon, weights=w_even)
+        assert norm_dark > norm_even
 
 
 # --- integrated score_night --------------------------------------------------
