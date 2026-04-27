@@ -560,9 +560,23 @@ class AstroAlertApp(tk.Tk):
         canvas.bind("<Configure>", lambda e: canvas.itemconfig(_win, width=e.width))
 
         def _on_mousewheel(e):
-            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+            delta = e.delta
+            if sys.platform != "darwin":
+                delta = delta // 120
+            canvas.yview_scroll(int(-1 * delta), "units")
         canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
         canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        # Linux trackpad/wheel
+        canvas.bind("<Enter>", lambda e: (
+            canvas.bind_all("<Button-4>", lambda ev: canvas.yview_scroll(-1, "units")),
+            canvas.bind_all("<Button-5>", lambda ev: canvas.yview_scroll(1, "units")),
+            canvas.bind_all("<MouseWheel>", _on_mousewheel),
+        ))
+        canvas.bind("<Leave>", lambda e: (
+            canvas.unbind_all("<Button-4>"),
+            canvas.unbind_all("<Button-5>"),
+            canvas.unbind_all("<MouseWheel>"),
+        ))
 
         ttk.Label(inner, text="Email Credentials",
                   font=(FONT_PROP, 17, "bold")).pack(pady=(0, 5))
