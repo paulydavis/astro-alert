@@ -680,9 +680,10 @@ class AstroAlertApp(tk.Tk):
         home_card.columnconfigure(1, weight=1)
 
         self._home_geo_results: list[dict] = []
-        self._home_search_var = tk.StringVar()
-        self._home_lat_var    = tk.StringVar()
-        self._home_lon_var    = tk.StringVar()
+        self._home_search_var  = tk.StringVar()
+        self._home_lat_var     = tk.StringVar()
+        self._home_lon_var     = tk.StringVar()
+        self._home_status_var  = tk.StringVar()
 
         ttk.Label(home_card, text="Search:", style="CardDim.TLabel").grid(
             row=0, column=0, sticky="w", pady=8, padx=(16, 12))
@@ -692,14 +693,17 @@ class AstroAlertApp(tk.Tk):
         home_entry.bind("<Return>", lambda _e: self._search_home_location())
         self._home_search_btn = ttk.Button(home_card, text="Search", width=8,
                                             command=self._search_home_location)
-        self._home_search_btn.grid(row=0, column=2, padx=(8, 16), pady=8)
+        self._home_search_btn.grid(row=0, column=2, padx=(8, 4), pady=8)
+        self._home_detect_btn = ttk.Button(home_card, text="Detect", width=8,
+                                            command=self._detect_home_location)
+        self._home_detect_btn.grid(row=0, column=3, padx=(0, 16), pady=8)
 
         self._home_results_var   = tk.StringVar()
         self._home_results_combo = ttk.Combobox(home_card,
                                                  textvariable=self._home_results_var,
                                                  state="disabled",
                                                  font=(FONT_PROP, 11))
-        self._home_results_combo.grid(row=1, column=0, columnspan=3,
+        self._home_results_combo.grid(row=1, column=0, columnspan=4,
                                        sticky="ew", padx=16, pady=(0, 8))
         self._home_results_combo.bind("<<ComboboxSelected>>",
                                        self._on_home_result_selected)
@@ -712,9 +716,11 @@ class AstroAlertApp(tk.Tk):
                       width=18).grid(row=row_idx, column=1, sticky="w", pady=6)
 
         home_btn_row = ttk.Frame(inner)
-        home_btn_row.pack(pady=(14, 24))
+        home_btn_row.pack(pady=(14, 4))
         ttk.Button(home_btn_row, text="Save Home Location", style="Accent.TButton",
                    command=self._save_home_location).pack()
+        ttk.Label(inner, textvariable=self._home_status_var,
+                  style="Dim.TLabel").pack(pady=(4, 24))
 
         self.after(50, self._load_credentials_to_form)
         self.after(100, lambda: canvas.configure(scrollregion=canvas.bbox("all")))
@@ -834,6 +840,32 @@ class AstroAlertApp(tk.Tk):
                             f"Home set to {lat:.4f}, {lon:.4f}.\n"
                             "Drive times will now calculate automatically when adding sites.",
                             parent=self)
+
+    def _detect_home_location(self):
+        self._home_detect_btn.configure(state="disabled", text="…")
+        threading.Thread(target=self._do_ip_detect, daemon=True).start()
+
+    def _do_ip_detect(self):
+        try:
+            lat, lon, display = _detect_ip_location()
+            self.after(0, self._ip_detect_done, lat, lon, display)
+        except Exception as e:
+            self.after(0, self._ip_detect_error, str(e))
+
+    def _ip_detect_done(self, lat: float, lon: float, display: str):
+        self._home_detect_btn.configure(state="normal", text="Detect")
+        self._home_search_var.set(display)
+        self._home_lat_var.set(f"{lat:.5f}")
+        self._home_lon_var.set(f"{lon:.5f}")
+        self._home_status_var.set(
+            f"Location detected: {display} — click Save to confirm"
+        )
+
+    def _ip_detect_error(self, _msg: str):
+        self._home_detect_btn.configure(state="normal", text="Detect")
+        self._home_status_var.set(
+            "Could not detect location — try searching manually"
+        )
 
     def _toggle_password(self):
         self._pass_shown = not self._pass_shown

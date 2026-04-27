@@ -998,3 +998,28 @@ class TestSettingsTab:
         vals = dotenv_values(fake_env)
         assert "SMTP_HOST" not in vals
         assert "SMTP_PORT" not in vals
+
+    def test_home_detect_btn_exists(self, app):
+        assert hasattr(app, "_home_detect_btn")
+
+    def test_home_status_var_exists(self, app):
+        assert hasattr(app, "_home_status_var")
+
+    def test_ip_detect_done_populates_fields(self, app):
+        app._ip_detect_done(35.99, -78.89, "Durham, North Carolina")
+        assert app._home_lat_var.get() == "35.99000"
+        assert app._home_lon_var.get() == "-78.89000"
+        assert app._home_search_var.get() == "Durham, North Carolina"
+        assert "Durham, North Carolina" in app._home_status_var.get()
+        assert "Save" in app._home_status_var.get()
+
+    def test_ip_detect_error_sets_status(self, app):
+        app._ip_detect_error("timeout")
+        assert "try searching manually" in app._home_status_var.get()
+
+    def test_detect_button_starts_thread(self, app):
+        with patch("threading.Thread") as mock_thread:
+            mock_thread.return_value.start = MagicMock()
+            app._detect_home_location()
+        assert str(app._home_detect_btn.cget("state")) == "disabled"
+        mock_thread.assert_called_once()
