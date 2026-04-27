@@ -17,7 +17,7 @@ ENV = {
 }
 
 
-def make_score(go=True, total=72, weather=30, seeing=22, moon=20, warnings=None):
+def make_score(go=True, total=72, weather=75, seeing=73, moon=67, warnings=None):
     return Score(
         total=total,
         weather_score=weather,

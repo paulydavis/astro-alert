@@ -71,7 +71,7 @@ def _format_report(report: SiteReport) -> list[str]:
     lines = [
         f"{report.site_name} ({drive})",
         f"  {go_label} - {score.total}/100  "
-        f"[weather {score.weather_score}/40, seeing {score.seeing_score}/30, moon {score.moon_score}/30]",
+        f"[weather {score.weather_score}%, seeing {score.seeing_score}%, moon {score.moon_score}%]",
     ]
     if score.warnings:
         lines.append("  " + " / ".join(score.warnings))

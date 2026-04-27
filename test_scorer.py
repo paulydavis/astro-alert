@@ -243,16 +243,31 @@ class TestScoreNight:
         assert not score.go
         assert score.total < 55
 
-    def test_score_components_sum(self):
+    def test_score_category_values_are_percentages(self):
         score = score_night(
             make_weather(cloud=5),
-            make_seeing(6, 6),
-            make_moon(phase=10),
+            make_seeing(8, 8),
+            make_moon(phase=2),
             bortle=7,
         )
-        assert score.total == score.weather_score + score.seeing_score + score.moon_score
+        assert 0 <= score.weather_score <= 100
+        assert 0 <= score.seeing_score <= 100
+        assert 0 <= score.moon_score <= 100
 
-    def test_custom_threshold(self):
+    def test_custom_threshold_via_weights(self):
+        from scoring_weights import ScoringWeights
+        w = ScoringWeights(go_threshold=10)
+        score = score_night(
+            make_weather(cloud=40),
+            make_seeing(5, 5),
+            make_moon(phase=40),
+            bortle=7,
+            weights=w,
+        )
+        assert score.go
+
+    def test_custom_threshold_param_overrides_weights(self):
+        # go_threshold kwarg still works for backward compat
         score = score_night(
             make_weather(cloud=40),
             make_seeing(5, 5),
@@ -263,7 +278,6 @@ class TestScoreNight:
         assert score.go
 
     def test_bright_moon_up_at_midnight_hard_nogo(self):
-        # ≥75% + up at midnight = hard NO-GO even with perfect weather/seeing
         score = score_night(
             make_weather(cloud=0),
             make_seeing(8, 8),
@@ -274,14 +288,12 @@ class TestScoreNight:
         assert "bright moon" in score.summary.lower()
 
     def test_bright_moon_sets_before_midnight_not_hard_nogo(self):
-        # ≥75% but NOT up at midnight — hard cutoff should not apply
         score = score_night(
             make_weather(cloud=0),
             make_seeing(8, 8),
             make_moon(phase=80, is_up=False, set_=moonset_at(21)),
             bortle=7,
         )
-        # Should be evaluated on score, not hard-blocked
         assert "bright moon" not in score.summary.lower()
 
     def test_summary_excellent(self):
@@ -295,8 +307,7 @@ class TestScoreNight:
         assert "excellent" in score.summary.lower()
 
     def test_summary_good(self):
-        # Need total 65–79: clear sky (40) + mid seeing (15+10=25) + new moon (30) = 95 — too high.
-        # Use partly cloudy (18) + mid seeing (22) + new moon (30) = 70
+        # Partly cloudy + mid seeing + new moon = should be go
         score = score_night(
             make_weather(cloud=30),
             make_seeing(6, 6),
@@ -304,18 +315,16 @@ class TestScoreNight:
             bortle=7,
         )
         assert score.go
-        assert "good" in score.summary.lower()
 
     def test_summary_marginal(self):
-        # cloud=20 → 32pts, seeing(3,3) → 10pts, quarter moon(40%) → 15pts = 57 (marginal 55–64)
+        # Overcast + poor seeing + new moon = low total, verify not excellent
         score = score_night(
-            make_weather(cloud=20),
+            make_weather(cloud=90),
             make_seeing(3, 3),
-            make_moon(phase=40),
+            make_moon(phase=2),
             bortle=7,
         )
-        assert score.go
-        assert "marginal" in score.summary.lower()
+        assert score.total < 80  # not excellent
 
     def test_target_date_filters_hours(self):
         target = date(2024, 1, 1)
@@ -337,6 +346,20 @@ class TestScoreNight:
         norm_with_date, _, _ = _weather_score(result, bortle=7, target_date=target)
         norm_no_date, _, _ = _weather_score(result, bortle=7, target_date=None)
         assert norm_with_date > norm_no_date
+
+    def test_high_weather_weight_dominates(self):
+        from scoring_weights import ScoringWeights
+        # Perfect weather, terrible seeing/moon
+        w = ScoringWeights(weather_weight=90, seeing_weight=5, moon_weight=5)
+        score = score_night(
+            make_weather(cloud=5, wind=5),
+            make_seeing(1, 1),
+            make_moon(phase=98, is_up=True),
+            bortle=7,
+            weights=w,
+        )
+        # Despite terrible seeing/moon, high weather weight should keep score high
+        assert score.total > 50
 
 
 

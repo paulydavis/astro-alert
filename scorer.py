@@ -12,14 +12,14 @@ from weather import WeatherResult
 
 @dataclass
 class Score:
-    total: int              # 0–100
-    weather_score: int      # 0–40
-    seeing_score: int       # 0–30
-    moon_score: int         # 0–30
-    go: bool                # True if total >= threshold
+    total: int              # 0–100 weighted combined score
+    weather_score: int      # 0–100 normalized weather sub-score
+    seeing_score: int       # 0–100 normalized seeing sub-score
+    moon_score: int         # 0–100 normalized moon sub-score
+    go: bool
     summary: str
     warnings: list[str]
-    avg_cloud_pct: int = -1  # -1 = data unavailable
+    avg_cloud_pct: int = -1
 
 
 def _imaging_hours(target_date: date) -> set[datetime]:
@@ -236,27 +236,30 @@ def score_night(
     moon: MoonInfo,
     bortle: int,
     target_date: Optional[date] = None,
-    go_threshold: int = 55,
+    go_threshold: Optional[int] = None,
+    weights: Optional[ScoringWeights] = None,
 ) -> Score:
-    w_norm, w_warn, avg_cloud = _weather_score(weather, bortle, target_date)
-    s_norm, s_warn = _seeing_score(seeing, target_date)
-    m_norm, m_warn = _moon_score(moon)
+    if weights is None:
+        weights = ScoringWeights()
+    threshold = go_threshold if go_threshold is not None else weights.go_threshold
 
-    # Convert normalized floats (0–1) back to integer scores for compatibility
-    w_pts = int(w_norm * 40)
-    s_pts = int(s_norm * 30)
-    # temporary shim — Task 5 will replace with proper normalized formula
-    m_pts = int(m_norm * 30)
+    w_norm, w_warn, avg_cloud = _weather_score(weather, bortle, target_date, weights)
+    s_norm, s_warn = _seeing_score(seeing, target_date, weights)
+    m_norm, m_warn = _moon_score(moon, weights)
 
-    total = w_pts + s_pts + m_pts
+    total_w = weights.weather_weight + weights.seeing_weight + weights.moon_weight
+    total = int(
+        (weights.weather_weight * w_norm + weights.seeing_weight * s_norm + weights.moon_weight * m_norm)
+        / total_w * 100
+    )
+
     all_warnings = w_warn + s_warn + m_warn
-    # Hard cutoff: bright moon that's still up at midnight ruins the whole night
     moon_kills_night = moon.phase_pct >= 75 and moon.is_up_at_midnight
 
     if moon_kills_night:
         go = False
         summary = f"No-go — bright moon ({moon.phase_pct:.0f}%) up all night."
-    elif total >= go_threshold:
+    elif total >= threshold:
         go = True
         if total >= 80:
             summary = "Excellent night — go image."
@@ -270,9 +273,9 @@ def score_night(
 
     return Score(
         total=total,
-        weather_score=w_pts,
-        seeing_score=s_pts,
-        moon_score=m_pts,
+        weather_score=int(w_norm * 100),
+        seeing_score=int(s_norm * 100),
+        moon_score=int(m_norm * 100),
         go=go,
         summary=summary,
         warnings=all_warnings,
