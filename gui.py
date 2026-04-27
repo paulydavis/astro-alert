@@ -842,6 +842,7 @@ class AstroAlertApp(tk.Tk):
                             parent=self)
 
     def _detect_home_location(self):
+        self._home_status_var.set("")
         self._home_detect_btn.configure(state="disabled", text="…")
         threading.Thread(target=self._do_ip_detect, daemon=True).start()
 
