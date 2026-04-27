@@ -4,7 +4,7 @@ Go/no-go email alert system for astrophotography sessions. Fetches weather, atmo
 
 ## GUI
 
-Astro Alert has a graphical control panel with four tabs:
+Astro Alert has a graphical control panel with five tabs:
 
 **Dashboard** — run a dry-run or live forecast for any site, with colour-coded GO/NO-GO output.
 
@@ -19,6 +19,10 @@ Astro Alert has a graphical control panel with four tabs:
 **Schedule** — set up the two automatic daily emails with one click. Astro Alert runs itself in the background every day — no need to remember to open it.
 
 ![Schedule](screenshots/schedule.png)
+
+**Scoring** — adjust how much each factor (weather, seeing, moon) contributes to the go/no-go score. Sliders for all top-level and sub-weights; changes persist across sessions and are picked up by the next forecast run.
+
+![Scoring](screenshots/scoring.png)
 
 **Settings** — enter your Gmail address and App Password. Also set your **Home Location** (address search with autocomplete) — this becomes the starting point for automatic drive-time calculations. Credentials and home location are saved to your OS user data directory (never next to the source files).
 
@@ -83,15 +87,17 @@ Every evening at **6pm**, an email arrives with tomorrow night's forecast across
 
 Each site is scored 0–100:
 
-| Component | Weight | Source |
-|-----------|--------|--------|
-| Weather (clouds, precip, wind, dew) | 0–40 | Open-Meteo |
-| Seeing & transparency | 0–30 | 7timer.info (ASTRO product) |
-| Moon phase & position | 0–30 | ephem |
+| Component | Default weight | Source |
+|-----------|---------------|--------|
+| Weather (clouds, wind, humidity/dew) | 40 | Open-Meteo |
+| Seeing & transparency | 30 | 7timer.info (ASTRO product) |
+| Moon phase & dark hours | 30 | ephem |
 
-**GO threshold: 55/100.** Scoring is Bortle-aware — cloud cover is weighted more heavily at dark sites (Bortle ≤ 4) where sky quality is the whole point of the drive.
+Weights are relative and normalized automatically — setting Weather to 80 and the others to 20 each means weather is twice as influential, not that the score range changes. All weights are configurable in the **Scoring** tab.
 
-**Moon hard cutoff:** if the moon is ≥ 75% illuminated and still up at midnight, the night is automatically NO-GO regardless of score. If the moon is ≥ 75% but sets before midnight, the score reflects the usable dark hours after moonset (up to 12/30) and the email notes what time to start imaging.
+**GO threshold: 55/100** (configurable). Scoring is Bortle-aware — cloud cover is weighted more heavily at dark sites (Bortle ≤ 4) where sky quality is the whole point of the drive.
+
+**Moon hard cutoff:** if the moon is ≥ 75% illuminated and still up at midnight, the night is automatically NO-GO regardless of score. If the moon is ≥ 75% but sets before midnight, the score reflects the usable dark hours after moonset and the email notes what time to start imaging.
 
 ## Sites
 
@@ -286,40 +292,40 @@ python3 astro_alert.py add-site my_spot "My Dark Spot" 35.5 -79.2 150 3 America/
 Moon: 79% illuminated  rises 20:22Z  sets 08:17Z
 
 Jordan Lake SRA (36min drive)
-  NO-GO — 30/100  [weather 8/40, seeing 21/30, moon 1/30]
-  Partly cloudy (40% avg) · Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
+  NO-GO — 30/100  [weather 21%, seeing 70%, moon 3%]
+  Partly cloudy (40%) · Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 Eno River State Park (40min drive)
-  NO-GO — 29/100  [weather 8/40, seeing 20/30, moon 1/30]
-  Partly cloudy (39% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
+  NO-GO — 29/100  [weather 21%, seeing 67%, moon 3%]
+  Partly cloudy (39%) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 Little River Regional Park (48min drive)
-  NO-GO — 20/100  [weather 0/40, seeing 19/30, moon 1/30]
-  Mostly cloudy (53% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
+  NO-GO — 20/100  [weather 7%, seeing 63%, moon 3%]
+  Mostly cloudy (53%) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 Medoc Mountain State Park (70min drive)
-  NO-GO — 50/100  [weather 30/40, seeing 19/30, moon 1/30]
+  NO-GO — 50/100  [weather 79%, seeing 63%, moon 3%]
   Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 Uwharrie National Forest (105min drive)
-  NO-GO — 20/100  [weather 0/40, seeing 19/30, moon 1/30]
-  Mostly cloudy (61% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
+  NO-GO — 20/100  [weather 7%, seeing 63%, moon 3%]
+  Mostly cloudy (61%) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 Bladen Lakes State Forest (120min drive)
-  GO — 57/100  [weather 22/40, seeing 34/30, moon 1/30]
+  GO — 57/100  [weather 57%, seeing 100%, moon 3%]
   Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 James River State Park (120min drive)
-  NO-GO — 20/100  [weather 0/40, seeing 19/30, moon 1/30]
-  Mostly cloudy (73% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
+  NO-GO — 20/100  [weather 7%, seeing 63%, moon 3%]
+  Mostly cloudy (73%) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 Staunton River State Park (120min drive)
-  NO-GO — 33/100  [weather 12/40, seeing 20/30, moon 1/30]
-  Partly cloudy (47% avg) · Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
+  NO-GO — 33/100  [weather 36%, seeing 67%, moon 3%]
+  Partly cloudy (47%) · Poor transparency (2.3/8) · Bright moon (79% illuminated) · Moon up at midnight
 
 Durham Home (home)
-  NO-GO — 29/100  [weather 8/40, seeing 20/30, moon 1/30]
-  Partly cloudy (32% avg) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
+  NO-GO — 29/100  [weather 21%, seeing 67%, moon 3%]
+  Partly cloudy (32%) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
 ```
 
 Sites are listed in drive-time order (shortest first). The subject line calls out the best GO site, or the highest-scoring site if everything is NO-GO.
@@ -330,14 +336,15 @@ Sites are listed in drive-time order (shortest first). The subject line calls ou
 astro_alert/
 ├── main.py              # Entry point: GUI when run bare, CLI when run with args
 ├── astro_alert.py       # CLI entry point and argument parser
-├── gui.py               # Tkinter GUI (dashboard, sites, schedule, settings)
+├── gui.py               # Tkinter GUI (dashboard, sites, schedule, scoring, settings)
 ├── data_dir.py          # Platform-aware user data directory
 ├── scheduler_setup.py   # Cross-platform cron / Task Scheduler install
 ├── site_manager.py      # Load/save sites.json
 ├── weather.py           # Open-Meteo weather fetch
 ├── seeing.py            # 7timer.info seeing/transparency fetch
 ├── moon.py              # Moon phase and rise/set via ephem
-├── scorer.py            # Bortle-aware 0–100 scoring
+├── scorer.py            # Bortle-aware 0–100 scoring with configurable weights
+├── scoring_weights.py   # ScoringWeights dataclass and persistence
 ├── smtp_notifier.py     # Provider-neutral SMTP email sender
 ├── notifier.py          # Alert dispatch
 ├── sites.json           # Site database (your locations)
@@ -348,7 +355,7 @@ astro_alert/
 ├── build.sh             # Build script for macOS / Linux
 ├── build.bat            # Build script for Windows
 ├── AstroAlert.desktop   # Linux app menu entry template
-└── test_*.py            # pytest test suite (274 tests)
+└── test_*.py            # pytest test suite (319 tests)
 ```
 
 ## Running tests

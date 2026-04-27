@@ -70,16 +70,21 @@ def run():
 
     def step4():
         screencap("schedule.png", app)
-        app._nb.select(3)           # Settings tab
+        app._nb.select(3)           # Scoring tab
         app.after(600, step5)
 
     def step5():
+        screencap("scoring.png", app)
+        app._nb.select(4)           # Settings tab
+        app.after(600, step6)
+
+    def step6():
         screencap("settings.png", app)
         # Open Add Site dialog
         dlg = gui.SiteDialog(app, title="Add Site")
-        app.after(400, lambda: step6(dlg))
+        app.after(400, lambda: step7(dlg))
 
-    def step6(dlg):
+    def step7(dlg):
         screencap_window("add_site_dialog.png", dlg)
         dlg.destroy()
         app.after(300, app.destroy)
