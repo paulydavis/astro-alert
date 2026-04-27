@@ -1,8 +1,12 @@
 """72-hour astrophotography forecast chart — color mapping and HTML generation."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
+
+from weather import fetch_weather
+from seeing import fetch_seeing
+from moon import get_moon_info
 
 
 @dataclass
@@ -86,3 +90,80 @@ def moon_color(pct: int) -> str:
     """New moon → dark gray, full moon → light gray."""
     v = int(60 + pct * 0.9)
     return f"#{v:02x}{v:02x}{v:02x}"
+
+
+def build_chart_data(site, hours: int = 72) -> ChartData:
+    """Assemble 72-hour ChartData for a site by fetching weather, seeing, and moon data."""
+    today = datetime.now(timezone.utc).date()
+    end_date = today + timedelta(days=2)
+    start_dt = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=timezone.utc)
+    errors = []
+
+    # ── Weather (one API call, 3 days) ────────────────────────────────────────
+    weather = fetch_weather(site.key, site.lat, site.lon,
+                            target_date=today, end_date=end_date)
+    if not weather.ok:
+        errors.append(f"Weather: {weather.error}")
+
+    hour_map = {
+        h.time.replace(minute=0, second=0, microsecond=0): h
+        for h in weather.hours
+    }
+
+    cloud, wind, humidity, temperature, precipitation = [], [], [], [], []
+    for i in range(hours):
+        t = start_dt + timedelta(hours=i)
+        hw = hour_map.get(t)
+        cloud.append(hw.cloud_cover_pct if hw else None)
+        wind.append(hw.wind_speed_kmh if hw else None)
+        humidity.append(hw.humidity_pct if hw else None)
+        temperature.append(hw.temp_c if hw else None)
+        precipitation.append(hw.precip_mm if hw else None)
+
+    # ── Seeing (3-hour blocks from 7timer) ───────────────────────────────────
+    seeing_result = fetch_seeing(site.key, site.lat, site.lon)
+    if not seeing_result.ok:
+        errors.append(f"Seeing: {seeing_result.error}")
+
+    seeing_map = {
+        sh.time.replace(minute=0, second=0, microsecond=0): sh
+        for sh in seeing_result.hours
+    }
+
+    seeing, transparency = [], []
+    for i in range(hours):
+        t = start_dt + timedelta(hours=i)
+        t3 = t.replace(hour=(t.hour // 3) * 3)
+        sh = seeing_map.get(t3)
+        seeing.append(float(sh.seeing) if sh else None)
+        transparency.append(float(sh.transparency) if sh else None)
+
+    # ── Moon (one call per day, spread across 24 hours) ──────────────────────
+    moon_pct: list = []
+    moon_events: dict = {}
+    num_days = (hours + 23) // 24
+    for day_offset in range(num_days):
+        d = today + timedelta(days=day_offset)
+        info = get_moon_info(site.lat, site.lon, target_date=d)
+        moon_pct.extend([int(info.phase_pct)] * 24)
+        for event_dt, label in [(info.rise_utc, "rise"), (info.set_utc, "set")]:
+            if event_dt:
+                delta = event_dt - start_dt
+                idx = int(delta.total_seconds() // 3600)
+                if 0 <= idx < hours:
+                    moon_events[idx] = label
+
+    return ChartData(
+        site_name=site.name,
+        start_dt=start_dt,
+        cloud=cloud,
+        seeing=seeing,
+        transparency=transparency,
+        wind=wind,
+        humidity=humidity,
+        temperature=temperature,
+        precipitation=precipitation,
+        moon_pct=moon_pct[:hours],
+        moon_events=moon_events,
+        errors=errors,
+    )
