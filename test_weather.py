@@ -139,3 +139,38 @@ class TestFetchWeatherParseErrors:
             result = fetch_weather(SITE, LAT, LON, date(2024, 1, 15))
         assert not result.ok
         assert "Parse error" in result.error
+
+
+# --- multi-day ranges --------------------------------------------------------
+
+def test_fetch_weather_three_day_range():
+    """fetch_weather with end_date returns hourly entries for all days in range."""
+    # Build a fake Open-Meteo response with 72 hourly entries (3 days × 24 hours)
+    start = datetime(2026, 5, 1, 0, tzinfo=timezone.utc)
+    times = [(start.replace(hour=0) + __import__('datetime').timedelta(hours=i)).strftime("%Y-%m-%dT%H:00") for i in range(72)]
+    fake_data = {
+        "hourly": {
+            "time": times,
+            "cloud_cover": [10] * 72,
+            "precipitation": [0.0] * 72,
+            "wind_speed_10m": [5.0] * 72,
+            "relative_humidity_2m": [50] * 72,
+            "dew_point_2m": [5.0] * 72,
+            "temperature_2m": [15.0] * 72,
+        }
+    }
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = fake_data
+    mock_resp.raise_for_status = MagicMock()
+
+    with patch("weather.requests.get", return_value=mock_resp):
+        result = fetch_weather(
+            "test", 35.9, -79.0,
+            target_date=date(2026, 5, 1),
+            end_date=date(2026, 5, 3),
+        )
+
+    assert result.ok
+    assert len(result.hours) == 72
+    assert result.hours[0].cloud_cover_pct == 10
+    assert result.hours[71].cloud_cover_pct == 10

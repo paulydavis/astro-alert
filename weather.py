@@ -33,21 +33,24 @@ class WeatherResult:
         return self.error is None
 
 
-def fetch_weather(site_key: str, lat: float, lon: float, target_date: Optional[date] = None) -> WeatherResult:
-    """Fetch hourly weather for lat/lon covering the imaging window of target_date night.
+def fetch_weather(site_key: str, lat: float, lon: float, target_date: Optional[date] = None, end_date: Optional[date] = None) -> WeatherResult:
+    """Fetch hourly weather for lat/lon.
 
-    Fetches target_date and target_date+1 so the full 20:00–04:00 window is available.
+    When end_date is provided, fetches from target_date through end_date (inclusive).
+    When end_date is None, defaults to target_date + 1 day (original behavior).
     Returns WeatherResult with error set if the API call fails — never raises.
     """
     if target_date is None:
         target_date = datetime.now(timezone.utc).date()
+    if end_date is None:
+        end_date = target_date + timedelta(days=1)
 
     params = {
         "latitude": lat,
         "longitude": lon,
         "hourly": "cloud_cover,precipitation,wind_speed_10m,relative_humidity_2m,dew_point_2m,temperature_2m",
         "start_date": target_date.isoformat(),
-        "end_date": (target_date + timedelta(days=1)).isoformat(),
+        "end_date": end_date.isoformat(),
         "wind_speed_unit": "kmh",
         "timezone": "UTC",
     }
