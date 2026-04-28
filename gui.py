@@ -1043,7 +1043,11 @@ class AstroAlertApp(tk.Tk):
                          variable=self._email_format_var,
                          value="html").pack(anchor="w", padx=16, pady=(0, 8))
 
+        self._loading_email_format = False
+
         def _on_email_format_change(*_):
+            if getattr(self, "_loading_email_format", False):
+                return
             from data_dir import ENV_FILE
             from dotenv import set_key
             ENV_FILE.touch()
@@ -1126,7 +1130,9 @@ class AstroAlertApp(tk.Tk):
             self._smtp_port_var.set(vals.get("SMTP_PORT", "587"))
             self._smtp_detail_frame.pack(fill="x", ipadx=28, ipady=12)
         if hasattr(self, "_email_format_var"):
+            self._loading_email_format = True
             self._email_format_var.set(vals.get("EMAIL_FORMAT", "plain"))
+            self._loading_email_format = False
 
     def _save_credentials(self, silent=False):
         import unicodedata

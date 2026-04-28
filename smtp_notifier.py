@@ -1,5 +1,6 @@
 """Send go/no-go alerts via SMTP (defaults to Gmail)."""
 
+import html
 import os
 import smtplib
 import unicodedata
@@ -127,9 +128,10 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
             plain_body = "\n".join(body_lines).strip()
             html_body  = render_html(chart_data)
             html_body  = html_body.replace(
-                "</body></html>",
+                "</body>",
                 f'<pre style="font-family:monospace;color:#c9d1d9;margin-top:16px">'
-                f'{plain_body}</pre></body></html>'
+                f'{html.escape(plain_body)}</pre></body>',
+                1
             )
 
             from email.mime.multipart import MIMEMultipart
@@ -152,8 +154,11 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
                 return EmailResult(sent=False, error="Auth failed — check your App Password.")
             except Exception as e:
                 return EmailResult(sent=False, error=str(e))
-        except Exception:
-            pass  # fall through to plain text
+        except Exception as _html_exc:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "HTML email failed, falling back to plain text: %s", _html_exc
+            )
 
     msg = EmailMessage()
     msg["Subject"] = subject
