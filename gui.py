@@ -597,7 +597,7 @@ class AstroAlertApp(tk.Tk):
         ttk.Label(ctrl, text="Site:", style="Dim.TLabel").pack(side="left")
         self._forecast_site_var   = tk.StringVar(value="")
         self._forecast_site_combo = ttk.Combobox(ctrl, textvariable=self._forecast_site_var,
-                                                  state="readonly", width=24,
+                                                  state="readonly", width=32,
                                                   font=(FONT_PROP, 12))
         self._forecast_site_combo.pack(side="left", padx=(8, 0))
 
@@ -881,7 +881,7 @@ class AstroAlertApp(tk.Tk):
         ttk.Label(ctrl, text="Site:", style="Dim.TLabel").pack(side="left")
         self._chart_site_var   = tk.StringVar(value="")
         self._chart_site_combo = ttk.Combobox(ctrl, textvariable=self._chart_site_var,
-                                               state="readonly", width=24,
+                                               state="readonly", width=32,
                                                font=(FONT_PROP, 12))
         self._chart_site_combo.pack(side="left", padx=(8, 0))
 
@@ -896,6 +896,8 @@ class AstroAlertApp(tk.Tk):
         self._chart_error_lbl.pack(side="left", padx=(16, 0))
 
         ttk.Separator(parent).pack(fill="x", pady=(14, 0))
+
+        self._build_chart_legend(parent)
 
         # ── Canvas + scrollbars ───────────────────────────────────────────────
         frame = ttk.Frame(parent)
@@ -988,6 +990,60 @@ class AstroAlertApp(tk.Tk):
         self._chart_load_btn.configure(state="normal", text="Load Chart")
         self._chart_error_var.set(f"Error: {msg}")
         self._set_status("Chart load failed.")
+
+    def _build_chart_legend(self, parent):
+        from chart_html import (cloud_color, wind_color, temperature_color,
+                                 precipitation_color, moon_color, _MISSING)
+
+        outer = ttk.Frame(parent)
+        outer.pack(fill="x", padx=26, pady=(8, 4))
+
+        SWATCH_W = 26
+        SWATCH_H = 13
+
+        def swatch_group(title, entries):
+            grp = tk.Frame(outer, bg=BG)
+            grp.pack(side="left", padx=(0, 20), anchor="n")
+            tk.Label(grp, text=title, bg=BG, fg=TEXT_DIM,
+                     font=(FONT_PROP, 8)).pack(anchor="w")
+            row = tk.Frame(grp, bg=BG)
+            row.pack(anchor="w")
+            for i, (color, lbl) in enumerate(entries):
+                if i > 0:
+                    tk.Label(row, text="→", bg=BG, fg=TEXT_DIM,
+                             font=(FONT_PROP, 8)).pack(side="left")
+                tk.Frame(row, bg=color, width=SWATCH_W,
+                         height=SWATCH_H).pack(side="left")
+                if lbl:
+                    tk.Label(row, text=lbl, bg=BG, fg=TEXT_DIM,
+                             font=(FONT_PROP, 8)).pack(side="left", padx=(2, 0))
+
+        swatch_group("Cloud / Seeing / Transp / Humidity", [
+            (cloud_color(0),   "Good"),
+            (cloud_color(50),  ""),
+            (cloud_color(100), "Poor"),
+        ])
+        swatch_group("Wind", [
+            (wind_color(0),  "Calm"),
+            (wind_color(20), ""),
+            (wind_color(40), "Strong"),
+        ])
+        swatch_group("Temperature", [
+            (temperature_color(-15), "Cold"),
+            (temperature_color(5),   "Mild"),
+            (temperature_color(30),  "Warm"),
+        ])
+        swatch_group("Precip", [
+            (precipitation_color(0), "Dry"),
+            (precipitation_color(1), "Rain"),
+        ])
+        swatch_group("Moon", [
+            (moon_color(0),   "New"),
+            (moon_color(100), "Full"),
+        ])
+        swatch_group("No data", [
+            (_MISSING, "—"),
+        ])
 
     def _draw_chart(self, data):
         from chart_html import (cloud_color, seeing_color, transparency_color,
