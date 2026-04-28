@@ -79,6 +79,22 @@ def _detect_ip_location() -> tuple[float, float, str]:
     return float(data["lat"]), float(data["lon"]), f"{data['city']}, {data['regionName']}"
 
 
+def _forecast_imaging_window(target_date):
+    """Return the set of UTC datetimes covering 20:00–04:00 for target_date's imaging night."""
+    from datetime import datetime, timedelta, timezone
+    ev = {
+        datetime(target_date.year, target_date.month, target_date.day,
+                 h, tzinfo=timezone.utc)
+        for h in range(20, 24)
+    }
+    nd = target_date + timedelta(days=1)
+    ea = {
+        datetime(nd.year, nd.month, nd.day, h, tzinfo=timezone.utc)
+        for h in range(0, 5)
+    }
+    return ev | ea
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main application window
 # ─────────────────────────────────────────────────────────────────────────────
@@ -694,25 +710,11 @@ class AstroAlertApp(tk.Tk):
         threading.Thread(target=self._run_forecast_load, args=(key,), daemon=True).start()
 
     def _run_forecast_load(self, site_key: str):
-        from datetime import datetime, timedelta, timezone
         from site_manager import get_active_site
         from weather import fetch_weather_range
         from seeing import fetch_seeing, SeeingResult
         from moon import get_moon_info
         from scorer import score_night
-
-        def _imaging_window(target_date):
-            ev = {
-                datetime(target_date.year, target_date.month, target_date.day,
-                         h, tzinfo=timezone.utc)
-                for h in range(20, 24)
-            }
-            nd = target_date + timedelta(days=1)
-            ea = {
-                datetime(nd.year, nd.month, nd.day, h, tzinfo=timezone.utc)
-                for h in range(0, 5)
-            }
-            return ev | ea
 
         try:
             site         = get_active_site(override=site_key)
@@ -728,7 +730,7 @@ class AstroAlertApp(tk.Tk):
             nights = []
             for target_date, weather in weather_days:
                 moon   = get_moon_info(site.lat, site.lon, target_date)
-                window = _imaging_window(target_date)
+                window = _forecast_imaging_window(target_date)
 
                 night_seeing_hours = [seeing_by_time[t] for t in window
                                        if t in seeing_by_time]
@@ -808,8 +810,6 @@ class AstroAlertApp(tk.Tk):
 
 
     def _show_forecast_detail(self, night: dict):
-        from datetime import datetime, timedelta, timezone
-
         score = night["score"]
         moon  = night["moon"]
 
@@ -830,8 +830,8 @@ class AstroAlertApp(tk.Tk):
             text=f"Moon:     {score.moon_score}/100  "
                  f"({moon.phase_pct:.0f}% illuminated)")
 
-        warnings = [w for w in score.warnings
-                    if "Seeing data" not in w and "Beyond 7-day" not in w]
+        _SUPPRESS = {"Seeing data unavailable"}
+        warnings = [w for w in score.warnings if w not in _SUPPRESS]
         self._detail_warn_lbl.configure(
             text="\n".join(warnings) if warnings else "")
 
@@ -844,18 +844,7 @@ class AstroAlertApp(tk.Tk):
         if not weather.ok or not weather.hours:
             self._detail_hours_txt.insert("end", "Weather data unavailable.")
         else:
-            evening = {
-                datetime(target_date.year, target_date.month, target_date.day,
-                         h, tzinfo=timezone.utc)
-                for h in range(20, 24)
-            }
-            next_day = target_date + timedelta(days=1)
-            early = {
-                datetime(next_day.year, next_day.month, next_day.day,
-                         h, tzinfo=timezone.utc)
-                for h in range(0, 5)
-            }
-            window = evening | early
+            window = _forecast_imaging_window(target_date)
 
             night_rows = sorted(
                 [h for h in weather.hours if h.time in window],
