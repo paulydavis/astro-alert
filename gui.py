@@ -598,7 +598,7 @@ class AstroAlertApp(tk.Tk):
 
         # ── Treeview ──────────────────────────────────────────────────────────
         tree_frame = ttk.Frame(parent)
-        tree_frame.pack(fill="x", padx=26, pady=(12, 0))
+        tree_frame.pack(fill="both", expand=True, padx=26, pady=(12, 0))
 
         cols = ("date", "verdict", "score", "clouds", "moon")
         self._forecast_tree = ttk.Treeview(tree_frame, columns=cols,
@@ -683,10 +683,202 @@ class AstroAlertApp(tk.Tk):
             self._forecast_site_var.set(options[0])
 
     def _start_forecast_load(self):
-        pass  # implemented in Task 3
+        site_val = self._forecast_site_var.get()
+        if not site_val:
+            return
+        self._forecast_load_btn.configure(state="disabled", text="Loading…")
+        self._forecast_error_var.set("")
+        self._forecast_tree.delete(*self._forecast_tree.get_children())
+        self._forecast_nights = []
+        key = site_val.split(":")[0].strip()
+        threading.Thread(target=self._run_forecast_load, args=(key,), daemon=True).start()
+
+    def _run_forecast_load(self, site_key: str):
+        from datetime import datetime, timedelta, timezone
+        from site_manager import get_active_site
+        from weather import fetch_weather_range
+        from seeing import fetch_seeing, SeeingResult
+        from moon import get_moon_info
+        from scorer import score_night
+
+        def _imaging_window(target_date):
+            ev = {
+                datetime(target_date.year, target_date.month, target_date.day,
+                         h, tzinfo=timezone.utc)
+                for h in range(20, 24)
+            }
+            nd = target_date + timedelta(days=1)
+            ea = {
+                datetime(nd.year, nd.month, nd.day, h, tzinfo=timezone.utc)
+                for h in range(0, 5)
+            }
+            return ev | ea
+
+        try:
+            site         = get_active_site(override=site_key)
+            weather_days = fetch_weather_range(site.key, site.lat, site.lon, days=14)
+            seeing_all   = fetch_seeing(site.key, site.lat, site.lon)
+
+            seeing_by_time: dict = {}
+            if seeing_all.ok:
+                for sh in seeing_all.hours:
+                    t = sh.time.replace(minute=0, second=0, microsecond=0)
+                    seeing_by_time[t] = sh
+
+            nights = []
+            for target_date, weather in weather_days:
+                moon   = get_moon_info(site.lat, site.lon, target_date)
+                window = _imaging_window(target_date)
+
+                night_seeing_hours = [seeing_by_time[t] for t in window
+                                       if t in seeing_by_time]
+
+                if night_seeing_hours:
+                    night_seeing     = SeeingResult(site_key=site.key,
+                                                    fetched_at=seeing_all.fetched_at,
+                                                    hours=night_seeing_hours)
+                    seeing_available = True
+                elif not seeing_all.ok:
+                    night_seeing     = SeeingResult(site_key=site.key,
+                                                    fetched_at=seeing_all.fetched_at,
+                                                    hours=[], error=seeing_all.error)
+                    seeing_available = False
+                else:
+                    night_seeing     = SeeingResult(site_key=site.key,
+                                                    fetched_at=seeing_all.fetched_at,
+                                                    hours=[],
+                                                    error="Beyond 7-day forecast range")
+                    seeing_available = False
+
+                score = score_night(weather, night_seeing, moon, site.bortle, target_date)
+                nights.append({
+                    "date":             target_date,
+                    "score":            score,
+                    "moon":             moon,
+                    "weather":          weather,
+                    "seeing_available": seeing_available,
+                })
+
+            self.after(0, self._forecast_loaded, nights)
+        except Exception as e:
+            self.after(0, self._forecast_load_failed, str(e))
+
+    def _forecast_loaded(self, nights: list):
+        self._forecast_nights = nights
+        self._forecast_load_btn.configure(state="normal", text="Load Forecast")
+        self._forecast_error_var.set("")
+        self._forecast_tree.delete(*self._forecast_tree.get_children())
+
+        for night in nights:
+            target_date = night["date"]
+            score       = night["score"]
+            moon        = night["moon"]
+
+            date_str    = target_date.strftime("%a %b %-d")
+            verdict_str = "GO" if score.go else "no-go"
+            score_str   = f"{score.total}/100"
+            cloud_str   = f"{score.avg_cloud_pct}%" if score.avg_cloud_pct >= 0 else "—"
+            moon_str    = f"{moon.phase_pct:.0f}%"
+
+            tag = "go" if score.go else "nogo"
+            self._forecast_tree.insert("", "end",
+                values=(date_str, verdict_str, score_str, cloud_str, moon_str),
+                tags=(tag,))
+
+        self._set_status("Forecast loaded.")
+
+
+    def _forecast_load_failed(self, msg: str):
+        self._forecast_load_btn.configure(state="normal", text="Load Forecast")
+        self._forecast_error_var.set(f"Error: {msg}")
+        self._set_status("Forecast load failed.")
 
     def _on_forecast_select(self, _event):
-        pass  # implemented in Task 3
+        sel = self._forecast_tree.selection()
+        if not sel:
+            return
+        idx = self._forecast_tree.index(sel[0])
+        if idx >= len(self._forecast_nights):
+            return
+        if not self._forecast_detail_pane.winfo_ismapped():
+            self._forecast_detail_sep.pack(fill="x", pady=(12, 0))
+            self._forecast_detail_pane.pack(
+                fill="both", expand=True, padx=26, pady=(8, 16))
+        self._show_forecast_detail(self._forecast_nights[idx])
+
+
+    def _show_forecast_detail(self, night: dict):
+        from datetime import datetime, timedelta, timezone
+
+        score = night["score"]
+        moon  = night["moon"]
+
+        go_color = GO_CLR if score.go else NOGO_CLR
+        verdict  = "GO" if score.go else "NO-GO"
+        self._detail_score_lbl.configure(
+            text=f"{verdict}  {score.total}/100", foreground=go_color)
+        self._detail_weather_lbl.configure(
+            text=f"Weather:  {score.weather_score}/100")
+
+        if night["seeing_available"]:
+            self._detail_seeing_lbl.configure(
+                text=f"Seeing:   {score.seeing_score}/100")
+        else:
+            self._detail_seeing_lbl.configure(text="Seeing:   N/A")
+
+        self._detail_moon_lbl.configure(
+            text=f"Moon:     {score.moon_score}/100  "
+                 f"({moon.phase_pct:.0f}% illuminated)")
+
+        warnings = [w for w in score.warnings
+                    if "Seeing data" not in w and "Beyond 7-day" not in w]
+        self._detail_warn_lbl.configure(
+            text="\n".join(warnings) if warnings else "")
+
+        weather     = night["weather"]
+        target_date = night["date"]
+
+        self._detail_hours_txt.configure(state="normal")
+        self._detail_hours_txt.delete("1.0", "end")
+
+        if not weather.ok or not weather.hours:
+            self._detail_hours_txt.insert("end", "Weather data unavailable.")
+        else:
+            evening = {
+                datetime(target_date.year, target_date.month, target_date.day,
+                         h, tzinfo=timezone.utc)
+                for h in range(20, 24)
+            }
+            next_day = target_date + timedelta(days=1)
+            early = {
+                datetime(next_day.year, next_day.month, next_day.day,
+                         h, tzinfo=timezone.utc)
+                for h in range(0, 5)
+            }
+            window = evening | early
+
+            night_rows = sorted(
+                [h for h in weather.hours if h.time in window],
+                key=lambda h: h.time,
+            )
+
+            self._detail_hours_txt.insert(
+                "end", f"{'Hour':>5}  {'Clouds':>6}  {'Wind':>7}  {'Humidity':>8}\n")
+            self._detail_hours_txt.insert("end", "─" * 36 + "\n")
+
+            for h in night_rows:
+                self._detail_hours_txt.insert(
+                    "end",
+                    f"{h.time.strftime('%H:00'):>5}  "
+                    f"{h.cloud_cover_pct:>5}%  "
+                    f"{h.wind_speed_kmh:>5.0f}km/h  "
+                    f"{h.humidity_pct:>6}%\n",
+                )
+
+            if not night_rows:
+                self._detail_hours_txt.insert("end", "No hours in imaging window.")
+
+        self._detail_hours_txt.configure(state="disabled")
 
     # ── Chart tab ───────────────────────────────────────────────────────────────
 
