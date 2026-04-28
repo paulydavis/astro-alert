@@ -20,7 +20,7 @@ Astro Alert has a graphical control panel with seven tabs:
 
 ![Schedule](screenshots/schedule.png)
 
-**Forecast** — 14-night outlook for any site. Each night shows a GO/NO-GO verdict, total score, average cloud cover, and moon illumination. Click a row to expand a detail panel with the full score breakdown, imaging window hours (sunset → sunrise, local time), and — for GO nights — up to 10 recommended deep-sky objects ranked by peak altitude. Each target shows name, type, peak altitude, hours visible, zenith time (AM/PM), and a one-line imaging note. The detail panel scrolls if the window is small.
+**Forecast** — 14-night outlook for any site. Each night shows a GO/NO-GO verdict, total score, average cloud cover, and moon illumination. Click a row to expand a detail panel with the full score breakdown, imaging window hours (sunset → sunrise, local time), and — for GO nights — up to 10 recommended deep-sky objects ranked by peak altitude. Each target shows name, type, peak altitude, hours visible, zenith time (AM/PM), and a one-line imaging note. The night list and detail panel are separated by a draggable sash so you can resize each section to taste. The detail panel scrolls independently if the window is small.
 
 ![Forecast](screenshots/forecast.png)
 

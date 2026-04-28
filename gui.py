@@ -615,9 +615,12 @@ class AstroAlertApp(tk.Tk):
 
         ttk.Separator(parent).pack(fill="x", pady=(14, 0))
 
-        # ── Treeview ──────────────────────────────────────────────────────────
-        tree_frame = ttk.Frame(parent)
-        tree_frame.pack(fill="both", expand=True, padx=26, pady=(12, 0))
+        # ── PanedWindow: night list (top) + detail panel (bottom) ─────────────
+        self._forecast_paned = ttk.PanedWindow(parent, orient="vertical")
+        self._forecast_paned.pack(fill="both", expand=True, padx=26, pady=(12, 8))
+
+        # Top pane: night treeview
+        tree_frame = ttk.Frame(self._forecast_paned)
 
         cols = ("date", "verdict", "score", "clouds", "moon")
         self._forecast_tree = ttk.Treeview(tree_frame, columns=cols,
@@ -646,10 +649,11 @@ class AstroAlertApp(tk.Tk):
         self._forecast_tree.pack(side="left", fill="x", expand=True)
 
         self._forecast_tree.bind("<<TreeviewSelect>>", self._on_forecast_select)
+        self._forecast_paned.add(tree_frame, weight=1)
 
-        # ── Detail panel (hidden until first row selection) ───────────────────
-        self._forecast_detail_sep  = ttk.Separator(parent)
-        self._forecast_detail_pane = ttk.Frame(parent, style="Card.TFrame")
+        # ── Detail panel (added to paned on first night selection) ────────────
+        self._forecast_detail_shown = False
+        self._forecast_detail_pane  = ttk.Frame(self._forecast_paned, style="Card.TFrame")
 
         # Scrollable canvas so the whole detail section scrolls when space is limited
         _detail_canvas = tk.Canvas(self._forecast_detail_pane, bg=CARD,
@@ -886,10 +890,9 @@ class AstroAlertApp(tk.Tk):
         idx = self._forecast_tree.index(sel[0])
         if idx >= len(self._forecast_nights):
             return
-        if not self._forecast_detail_pane.winfo_ismapped():
-            self._forecast_detail_sep.pack(fill="x", pady=(12, 0))
-            self._forecast_detail_pane.pack(
-                fill="both", expand=True, padx=26, pady=(8, 16))
+        if not self._forecast_detail_shown:
+            self._forecast_paned.add(self._forecast_detail_pane, weight=2)
+            self._forecast_detail_shown = True
         self._show_forecast_detail(self._forecast_nights[idx])
 
 
