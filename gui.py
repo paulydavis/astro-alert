@@ -18,6 +18,12 @@ import site_manager as sm
 from astro_alert import build_parser, cmd_run
 from site_manager import add_site, delete_site, list_sites, set_active_site
 
+try:
+    import tkintermapview
+    _MAP_AVAILABLE = True
+except ImportError:
+    _MAP_AVAILABLE = False
+
 # ── Platform fonts ─────────────────────────────────────────────────────────────
 _OS        = platform.system()
 FONT_PROP  = {"Darwin": "Helvetica", "Windows": "Segoe UI"}.get(_OS, "DejaVu Sans")
