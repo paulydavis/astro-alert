@@ -1906,7 +1906,8 @@ class SiteDialog(tk.Toplevel):
         ("notes",       "Notes",           str,   False),
     ]
 
-    def __init__(self, parent, title="Site", site=None, key=None):
+    def __init__(self, parent, title="Site", site=None, key=None,
+                 prefill_lat=None, prefill_lon=None):
         super().__init__(parent)
         self.title(title)
         self.configure(bg=BG)
@@ -1915,8 +1916,10 @@ class SiteDialog(tk.Toplevel):
         self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
-        self.result       = None
-        self._editing_key = key
+        self.result         = None
+        self._editing_key   = key
+        self._prefill_lat   = prefill_lat
+        self._prefill_lon   = prefill_lon
         self._geo_results: list[dict] = []
         self._build(site, key)
 
@@ -1990,8 +1993,10 @@ class SiteDialog(tk.Toplevel):
         defaults = {
             "key":         key or "",
             "name":        getattr(site, "name",        "") or "",
-            "lat":         str(getattr(site, "lat",     "")) if site else "",
-            "lon":         str(getattr(site, "lon",     "")) if site else "",
+            "lat":         str(getattr(site, "lat", "")) if site else (
+                               f"{self._prefill_lat:.6f}" if self._prefill_lat is not None else ""),
+            "lon":         str(getattr(site, "lon", "")) if site else (
+                               f"{self._prefill_lon:.6f}" if self._prefill_lon is not None else ""),
             "elevation_m": str(getattr(site, "elevation_m", "")) if site else "",
             "bortle":      str(getattr(site, "bortle",  "")) if site else "",
             "timezone":    getattr(site, "timezone", "America/New_York") or "America/New_York",
