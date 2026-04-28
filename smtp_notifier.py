@@ -96,7 +96,7 @@ def _render_targets_html(targets: list) -> str:
         f"{td}{html.escape(t.type)}</td>"
         f"{td}{t.peak_alt_deg:.0f}°</td>"
         f"{td}{t.hours_visible:.0f}h</td>"
-        f"{td}{t.transit_utc.strftime('%H:%M') if t.transit_utc else '—'} UTC</td>"
+        f"{td}{t.transit_utc.strftime('%I:%M %p').lstrip('0') if t.transit_utc else '—'} UTC</td>"
         f"{td_desc}{html.escape(t.description)}</td>"
         f"</tr>"
         for t in targets
@@ -107,7 +107,7 @@ def _render_targets_html(targets: list) -> str:
         '<table style="border-collapse:collapse;font-family:monospace;'
         'font-size:11px;color:#c9d1d9">'
         f"<tr>{th}Name</th>{th}Common Name</th>{th}Type</th>"
-        f"{th}Peak Alt</th>{th}Hrs Vis</th>{th}Transits (UTC)</th>"
+        f"{th}Peak Alt</th>{th}Hrs Vis</th>{th}Zenith (UTC)</th>"
         f'{th}Description</th></tr>'
         + rows
         + "</table>"

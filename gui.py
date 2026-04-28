@@ -651,7 +651,37 @@ class AstroAlertApp(tk.Tk):
         self._forecast_detail_sep  = ttk.Separator(parent)
         self._forecast_detail_pane = ttk.Frame(parent, style="Card.TFrame")
 
-        detail_inner = ttk.Frame(self._forecast_detail_pane, style="Card.TFrame")
+        # Scrollable canvas so the whole detail section scrolls when space is limited
+        _detail_canvas = tk.Canvas(self._forecast_detail_pane, bg=CARD,
+                                   highlightthickness=0, bd=0)
+        _detail_vsb = ttk.Scrollbar(self._forecast_detail_pane,
+                                     orient="vertical", command=_detail_canvas.yview)
+        _detail_canvas.configure(yscrollcommand=_detail_vsb.set)
+        _detail_vsb.pack(side="right", fill="y")
+        _detail_canvas.pack(side="left", fill="both", expand=True)
+
+        _scroll_inner = ttk.Frame(_detail_canvas, style="Card.TFrame")
+        _canvas_win   = _detail_canvas.create_window((0, 0), window=_scroll_inner,
+                                                      anchor="nw")
+
+        def _on_inner_resize(event):
+            _detail_canvas.configure(scrollregion=_detail_canvas.bbox("all"))
+
+        def _on_canvas_resize(event):
+            _detail_canvas.itemconfig(_canvas_win, width=event.width)
+
+        _scroll_inner.bind("<Configure>", _on_inner_resize)
+        _detail_canvas.bind("<Configure>", _on_canvas_resize)
+
+        def _on_mousewheel(event):
+            _detail_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        _detail_canvas.bind("<Enter>",
+                             lambda _: _detail_canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        _detail_canvas.bind("<Leave>",
+                             lambda _: _detail_canvas.unbind_all("<MouseWheel>"))
+
+        detail_inner = ttk.Frame(_scroll_inner, style="Card.TFrame")
         detail_inner.pack(fill="x", padx=26, pady=12)
 
         left = ttk.Frame(detail_inner, style="Card.TFrame")
@@ -686,8 +716,8 @@ class AstroAlertApp(tk.Tk):
         self._detail_hours_txt.pack(anchor="w")
 
         # ── Targets section (hidden until a GO night is selected) ─────────────
-        self._target_section_sep   = ttk.Separator(self._forecast_detail_pane)
-        self._target_section_frame = ttk.Frame(self._forecast_detail_pane,
+        self._target_section_sep   = ttk.Separator(_scroll_inner)
+        self._target_section_frame = ttk.Frame(_scroll_inner,
                                                 style="Card.TFrame")
 
         ttk.Label(self._target_section_frame,
@@ -701,21 +731,21 @@ class AstroAlertApp(tk.Tk):
             columns=target_cols, show="headings",
             height=8, selectmode="none",
         )
-        self._target_tree.heading("name",        text="Name")
-        self._target_tree.heading("common_name", text="Common Name")
-        self._target_tree.heading("type",        text="Type")
-        self._target_tree.heading("peak_alt",    text="Peak Alt")
-        self._target_tree.heading("hrs_vis",     text="Hrs Vis")
-        self._target_tree.heading("transits",    text="Transits")
-        self._target_tree.heading("description", text="Description")
+        self._target_tree.heading("name",        text="Name",        anchor="w")
+        self._target_tree.heading("common_name", text="Common Name", anchor="w")
+        self._target_tree.heading("type",        text="Type",        anchor="w")
+        self._target_tree.heading("peak_alt",    text="Peak Alt",    anchor="center")
+        self._target_tree.heading("hrs_vis",     text="Hrs Vis",     anchor="center")
+        self._target_tree.heading("transits",    text="Zenith",      anchor="center")
+        self._target_tree.heading("description", text="Description", anchor="w")
 
-        self._target_tree.column("name",        width=75,  anchor="w")
-        self._target_tree.column("common_name", width=155, anchor="w")
-        self._target_tree.column("type",        width=130, anchor="w")
-        self._target_tree.column("peak_alt",    width=65,  anchor="center")
-        self._target_tree.column("hrs_vis",     width=55,  anchor="center")
-        self._target_tree.column("transits",    width=70,  anchor="center")
-        self._target_tree.column("description", width=0,   anchor="w", stretch=True)
+        self._target_tree.column("name",        width=65,  anchor="w",      stretch=False)
+        self._target_tree.column("common_name", width=140, anchor="w",      stretch=False)
+        self._target_tree.column("type",        width=120, anchor="w",      stretch=False)
+        self._target_tree.column("peak_alt",    width=60,  anchor="center", stretch=False)
+        self._target_tree.column("hrs_vis",     width=50,  anchor="center", stretch=False)
+        self._target_tree.column("transits",    width=65,  anchor="center", stretch=False)
+        self._target_tree.column("description", width=180, anchor="w",      stretch=True)
 
         self._target_tree.pack(fill="both", expand=True, padx=26, pady=(0, 12))
 
@@ -937,9 +967,9 @@ class AstroAlertApp(tk.Tk):
             self._target_tree.delete(*self._target_tree.get_children())
             for t in targets:
                 if t.transit_utc and local_tz:
-                    transit_str = _local(t.transit_utc).strftime("%H:%M")
+                    transit_str = _local(t.transit_utc).strftime("%I:%M %p").lstrip("0")
                 elif t.transit_utc:
-                    transit_str = t.transit_utc.strftime("%H:%M")
+                    transit_str = t.transit_utc.strftime("%I:%M %p").lstrip("0")
                 else:
                     transit_str = "—"
                 self._target_tree.insert("", "end", values=(
