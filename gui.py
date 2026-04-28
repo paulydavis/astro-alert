@@ -388,28 +388,35 @@ class AstroAlertApp(tk.Tk):
     # ── Sites tab ───────────────────────────────────────────────────────────────
 
     def _build_sites_tab(self, parent):
+        self._sites_paned = ttk.PanedWindow(parent, orient="horizontal")
+        self._sites_paned.pack(fill="both", expand=True, padx=0, pady=0)
+
+        # ── Left pane: site list + buttons ──────────────────────────────────
+        left = ttk.Frame(self._sites_paned)
+        self._sites_paned.add(left, weight=1)
+
         cols = ("key", "name", "bortle", "drive", "timezone", "active")
-        self._tree = ttk.Treeview(parent, columns=cols, show="headings",
+        self._tree = ttk.Treeview(left, columns=cols, show="headings",
                                    selectmode="browse")
 
         for cid, heading, width, anchor in [
-            ("key",      "Key",       120, "w"),
-            ("name",     "Name",      200, "w"),
-            ("bortle",   "Bortle",     70, "center"),
-            ("drive",    "Drive",      80, "center"),
-            ("timezone", "Timezone",  180, "w"),
-            ("active",   "Active",     60, "center"),
+            ("key",      "Key",       110, "w"),
+            ("name",     "Name",      160, "w"),
+            ("bortle",   "Bortle",     60, "center"),
+            ("drive",    "Drive",      70, "center"),
+            ("timezone", "Timezone",  150, "w"),
+            ("active",   "Active",     50, "center"),
         ]:
             self._tree.heading(cid, text=heading)
-            self._tree.column(cid, width=width, minwidth=50, anchor=anchor)
+            self._tree.column(cid, width=width, minwidth=40, anchor=anchor)
 
-        vsb = ttk.Scrollbar(parent, orient="vertical", command=self._tree.yview)
+        vsb = ttk.Scrollbar(left, orient="vertical", command=self._tree.yview)
         self._tree.configure(yscrollcommand=vsb.set)
-        self._tree.pack(side="left", fill="both", expand=True, padx=(26, 0), pady=22)
-        vsb.pack(side="left", fill="y", pady=22)
+        self._tree.pack(side="left", fill="both", expand=True, padx=(18, 0), pady=16)
+        vsb.pack(side="left", fill="y", pady=16)
 
-        btns = ttk.Frame(parent)
-        btns.pack(side="right", fill="y", padx=22, pady=22)
+        btns = ttk.Frame(left)
+        btns.pack(side="right", fill="y", padx=16, pady=16)
 
         ttk.Button(btns, text="Add Site",
                    command=self._add_site_dialog).pack(fill="x", pady=(0, 8))
@@ -420,6 +427,28 @@ class AstroAlertApp(tk.Tk):
         ttk.Separator(btns).pack(fill="x", pady=8)
         ttk.Button(btns, text="Delete Site", style="Danger.TButton",
                    command=self._delete_site).pack(fill="x")
+
+        # ── Right pane: map ──────────────────────────────────────────────────
+        right = ttk.Frame(self._sites_paned)
+        self._sites_paned.add(right, weight=2)
+
+        if _MAP_AVAILABLE:
+            self._map_widget = tkintermapview.TkinterMapView(
+                right, corner_radius=0)
+            self._map_widget.pack(fill="both", expand=True)
+            self._map_widget.add_left_click_map_command(self._on_map_click)
+        else:
+            self._map_widget = None
+            self._map_fallback_label = ttk.Label(
+                right,
+                text="Map requires tkintermapview — run:  pip install tkintermapview",
+                style="Dim.TLabel",
+            )
+            self._map_fallback_label.pack(expand=True)
+
+    def _on_map_click(self, coords):
+        """Handle a left-click on the map (stub — wired up in Task 5)."""
+        pass
 
     def _refresh_sites(self):
         if hasattr(self, "_tree"):
