@@ -201,6 +201,7 @@ class AstroAlertApp(tk.Tk):
         self._tab_dash     = ttk.Frame(nb)
         self._tab_sites    = ttk.Frame(nb)
         self._tab_sched    = ttk.Frame(nb)
+        self._tab_forecast = ttk.Frame(nb)
         self._tab_chart    = ttk.Frame(nb)
         self._tab_scoring  = ttk.Frame(nb)
         self._tab_settings = ttk.Frame(nb)
@@ -208,6 +209,7 @@ class AstroAlertApp(tk.Tk):
         nb.add(self._tab_dash,     text="  Dashboard  ")
         nb.add(self._tab_sites,    text="  Sites  ")
         nb.add(self._tab_sched,    text="  Schedule  ")
+        nb.add(self._tab_forecast, text="  Forecast  ")
         nb.add(self._tab_chart,    text="  Chart  ")
         nb.add(self._tab_scoring,  text="  Scoring  ")
         nb.add(self._tab_settings, text="  Settings  ")
@@ -215,6 +217,7 @@ class AstroAlertApp(tk.Tk):
         self._build_dashboard(self._tab_dash)
         self._build_sites_tab(self._tab_sites)
         self._build_schedule_tab(self._tab_sched)
+        self._build_forecast_tab(self._tab_forecast)
         self._build_chart_tab(self._tab_chart)
         self._build_scoring_tab(self._tab_scoring)
         self._build_settings_tab(self._tab_settings)
@@ -565,6 +568,125 @@ class AstroAlertApp(tk.Tk):
                 self._set_status("Schedule removed.")
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
+
+    # ── Forecast tab ─────────────────────────────────────────────────────────────
+
+    def _build_forecast_tab(self, parent):
+        self._forecast_nights = []
+
+        # ── Controls row ──────────────────────────────────────────────────────
+        ctrl = ttk.Frame(parent)
+        ctrl.pack(fill="x", padx=26, pady=(20, 0))
+
+        ttk.Label(ctrl, text="Site:", style="Dim.TLabel").pack(side="left")
+        self._forecast_site_var   = tk.StringVar(value="")
+        self._forecast_site_combo = ttk.Combobox(ctrl, textvariable=self._forecast_site_var,
+                                                  state="readonly", width=24,
+                                                  font=(FONT_PROP, 12))
+        self._forecast_site_combo.pack(side="left", padx=(8, 0))
+
+        self._forecast_load_btn = ttk.Button(ctrl, text="Load Forecast",
+                                              style="Accent.TButton",
+                                              command=self._start_forecast_load)
+        self._forecast_load_btn.pack(side="left", padx=(16, 0))
+
+        self._forecast_error_var = tk.StringVar(value="")
+        ttk.Label(ctrl, textvariable=self._forecast_error_var,
+                  style="Dim.TLabel", foreground=WARN_CLR).pack(side="left", padx=(16, 0))
+
+        ttk.Separator(parent).pack(fill="x", pady=(14, 0))
+
+        # ── Treeview ──────────────────────────────────────────────────────────
+        tree_frame = ttk.Frame(parent)
+        tree_frame.pack(fill="x", padx=26, pady=(12, 0))
+
+        cols = ("date", "verdict", "score", "clouds", "moon")
+        self._forecast_tree = ttk.Treeview(tree_frame, columns=cols,
+                                            show="headings", height=14,
+                                            selectmode="browse")
+
+        self._forecast_tree.heading("date",    text="Date")
+        self._forecast_tree.heading("verdict", text="Verdict")
+        self._forecast_tree.heading("score",   text="Score")
+        self._forecast_tree.heading("clouds",  text="Clouds")
+        self._forecast_tree.heading("moon",    text="Moon")
+
+        self._forecast_tree.column("date",    width=130, anchor="w")
+        self._forecast_tree.column("verdict", width=80,  anchor="center")
+        self._forecast_tree.column("score",   width=80,  anchor="center")
+        self._forecast_tree.column("clouds",  width=80,  anchor="center")
+        self._forecast_tree.column("moon",    width=80,  anchor="center")
+
+        self._forecast_tree.tag_configure("go",   foreground=GO_CLR)
+        self._forecast_tree.tag_configure("nogo", foreground=NOGO_CLR)
+        self._forecast_tree.tag_configure("warn", foreground=WARN_CLR)
+
+        vsb = ttk.Scrollbar(tree_frame, command=self._forecast_tree.yview)
+        self._forecast_tree.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        self._forecast_tree.pack(side="left", fill="x", expand=True)
+
+        self._forecast_tree.bind("<<TreeviewSelect>>", self._on_forecast_select)
+
+        # ── Detail panel (hidden until first row selection) ───────────────────
+        self._forecast_detail_sep  = ttk.Separator(parent)
+        self._forecast_detail_pane = ttk.Frame(parent, style="Card.TFrame")
+
+        detail_inner = ttk.Frame(self._forecast_detail_pane, style="Card.TFrame")
+        detail_inner.pack(fill="both", expand=True, padx=26, pady=12)
+
+        left = ttk.Frame(detail_inner, style="Card.TFrame")
+        left.pack(side="left", fill="both", expand=True)
+
+        self._detail_score_lbl   = ttk.Label(left, text="", style="Card.TLabel",
+                                              font=(FONT_PROP, 22, "bold"))
+        self._detail_score_lbl.pack(anchor="w", pady=(8, 4))
+        self._detail_weather_lbl = ttk.Label(left, text="", style="CardDim.TLabel")
+        self._detail_weather_lbl.pack(anchor="w")
+        self._detail_seeing_lbl  = ttk.Label(left, text="", style="CardDim.TLabel")
+        self._detail_seeing_lbl.pack(anchor="w")
+        self._detail_moon_lbl    = ttk.Label(left, text="", style="CardDim.TLabel")
+        self._detail_moon_lbl.pack(anchor="w")
+        self._detail_warn_lbl    = ttk.Label(left, text="", style="CardDim.TLabel",
+                                              foreground=WARN_CLR, wraplength=350)
+        self._detail_warn_lbl.pack(anchor="w", pady=(8, 0))
+
+        ttk.Separator(detail_inner, orient="vertical").pack(
+            side="left", fill="y", padx=18, pady=8)
+
+        right = ttk.Frame(detail_inner, style="Card.TFrame")
+        right.pack(side="left", fill="both", expand=True)
+
+        ttk.Label(right, text="Imaging Window  (20:00–04:00 UTC)",
+                  style="CardDim.TLabel").pack(anchor="w", pady=(8, 4))
+        self._detail_hours_txt = tk.Text(
+            right, bg=CARD, fg=TEXT, font=(FONT_MONO, 11),
+            relief="flat", bd=0, state="disabled", height=10, width=42,
+            padx=4, pady=4,
+        )
+        self._detail_hours_txt.pack(anchor="w")
+
+        self.after(150, self._refresh_forecast_sites)
+
+
+    def _refresh_forecast_sites(self):
+        if not hasattr(self, "_forecast_site_combo"):
+            return
+        try:
+            from site_manager import list_sites
+            entries = list_sites()
+        except FileNotFoundError:
+            entries = []
+        options = [f"{k}: {s.name}" for k, s, _ in entries]
+        self._forecast_site_combo.configure(values=options)
+        if options and not self._forecast_site_var.get():
+            self._forecast_site_var.set(options[0])
+
+    def _start_forecast_load(self):
+        pass  # implemented in Task 3
+
+    def _on_forecast_select(self, _event):
+        pass  # implemented in Task 3
 
     # ── Chart tab ───────────────────────────────────────────────────────────────
 

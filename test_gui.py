@@ -121,9 +121,15 @@ class TestAppInit:
     def test_window_title(self, app):
         assert app.title() == "Astro Alert"
 
-    def test_has_notebook_with_six_tabs(self, app):
+    def test_has_notebook_with_seven_tabs(self, app):
         assert hasattr(app, "_nb")
-        assert app._nb.index("end") == 6
+        assert app._nb.index("end") == 7
+
+    def test_forecast_tab_frame_exists(self, app):
+        assert hasattr(app, "_tab_forecast")
+
+    def test_forecast_load_button_exists(self, app):
+        assert hasattr(app, "_forecast_load_btn")
 
     def test_run_button_exists(self, app):
         assert hasattr(app, "_run_btn")
