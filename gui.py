@@ -483,16 +483,22 @@ class AstroAlertApp(tk.Tk):
                 self._sync_map_markers()
                 return
             home = _get_home_location()
+            needs_drive: list[tuple[str, float, float]] = []
             for key, site, is_active in entries:
                 drive  = f"{site.drive_min} min" if site.drive_min else "—"
                 active = "★" if is_active else ""
                 if home and not is_active:
                     dist = f"{_haversine_miles(home[0], home[1], site.lat, site.lon):.0f}"
+                    if not site.drive_min:
+                        drive = "…"
+                        needs_drive.append((key, site.lat, site.lon))
                 else:
                     dist = "—"
                 self._tree.insert("", "end", iid=key,
                                   values=(key, site.name, site.bortle,
                                           drive, dist, site.timezone, active))
+            if needs_drive and home:
+                self._fetch_drive_times(home, needs_drive)
 
         if hasattr(self, "_site_combo"):
             try:
@@ -505,6 +511,25 @@ class AstroAlertApp(tk.Tk):
                 self._site_var.set("All sites")
 
         self._sync_map_markers()
+
+    def _fetch_drive_times(self, home: tuple, sites: list[tuple[str, float, float]]):
+        """Background-fetch OSRM drive times for sites showing '…' and update cells."""
+        import threading
+
+        def _worker():
+            home_lat, home_lon = home
+            for key, slat, slon in sites:
+                try:
+                    minutes = _osrm_drive_minutes(home_lat, home_lon, slat, slon)
+                    label = f"{minutes} min"
+                except Exception:
+                    label = "—"
+                self.after(0, lambda k=key, v=label: (
+                    self._tree.set(k, "drive", v)
+                    if self._tree.exists(k) else None
+                ))
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _sync_map_markers(self):
         """Clear and redraw site pins. If a row is selected, show only that site + active site."""
