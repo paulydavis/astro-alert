@@ -13,29 +13,28 @@ import gui
 OUT = Path(__file__).parent / "screenshots"
 OUT.mkdir(exist_ok=True)
 
-
-def screencap(filename: str, app: tk.Tk):
-    app.update_idletasks()
-    x = app.winfo_rootx()
-    y = app.winfo_rooty()
-    w = app.winfo_width()
-    h = app.winfo_height()
-    path = str(OUT / filename)
-    subprocess.run([
-        "screencapture", "-x", "-R", f"{x},{y},{w},{h}", path
-    ])
-    print(f"  saved {path}")
+# Tab order: Dashboard(0), Sites(1), Schedule(2), Forecast(3), Chart(4), Scoring(5), Settings(6)
+TABS = [
+    (0, "dashboard.png"),
+    (1, "sites.png"),
+    (2, "schedule.png"),
+    (3, "forecast.png"),
+    (4, "chart.png"),
+    (5, "scoring.png"),
+    (6, "settings.png"),
+]
 
 
-def screencap_window(filename: str, win: tk.Toplevel):
+def screencap(filename: str, win: tk.BaseWidget):
     win.update_idletasks()
+    win.update()
     x = win.winfo_rootx()
     y = win.winfo_rooty()
     w = win.winfo_width()
     h = win.winfo_height()
     path = str(OUT / filename)
-    subprocess.run(["screencapture", "-x", "-R", f"{x},{y},{w},{h}", path])
-    print(f"  saved {path}")
+    subprocess.run(["screencapture", "-x", "-R", f"{x},{y},{w},{h}", path], check=True)
+    print(f"  saved {filename}")
 
 
 def run():
@@ -43,55 +42,30 @@ def run():
     app.lift()
     app.focus_force()
 
-    def step1():
-        # Dashboard — run a dry-run so there's output to show
-        app._night_var.set("tonight")
-        app._dry_run_var.set(True)
-        app._start_forecast()
-        _wait_for_forecast(step2)
+    def shoot(idx=0):
+        if idx >= len(TABS):
+            # Also capture the Add Site dialog
+            dlg = gui.SiteDialog(app, title="Add Site")
+            app.after(500, lambda: _snap_dialog(dlg))
+            return
+        tab_idx, filename = TABS[idx]
+        app._nb.select(tab_idx)
+        app.update_idletasks()
+        app.update()
+        app.after(500, lambda: _snap_tab(idx, filename))
 
-    def _wait_for_forecast(callback, max_ms=30000, interval=500):
-        if str(app._run_btn.cget("state")) != "disabled":
-            app.after(300, callback)
-        elif max_ms <= 0:
-            app.after(0, callback)
-        else:
-            app.after(interval, lambda: _wait_for_forecast(callback, max_ms - interval, interval))
+    def _snap_tab(idx, filename):
+        screencap(filename, app)
+        shoot(idx + 1)
 
-    def step2():
-        screencap("dashboard.png", app)
-        app._nb.select(1)           # Sites tab
-        app.after(500, step3)
-
-    def step3():
-        screencap("sites.png", app)
-        app._nb.select(2)           # Schedule tab
-        app.after(600, step4)
-
-    def step4():
-        screencap("schedule.png", app)
-        app._nb.select(3)           # Scoring tab
-        app.after(600, step5)
-
-    def step5():
-        screencap("scoring.png", app)
-        app._nb.select(4)           # Settings tab
-        app.after(600, step6)
-
-    def step6():
-        screencap("settings.png", app)
-        # Open Add Site dialog
-        dlg = gui.SiteDialog(app, title="Add Site")
-        app.after(400, lambda: step7(dlg))
-
-    def step7(dlg):
-        screencap_window("add_site_dialog.png", dlg)
+    def _snap_dialog(dlg):
+        screencap("add_site_dialog.png", dlg)
         dlg.destroy()
-        app.after(300, app.destroy)
+        app.after(200, app.destroy)
 
-    app.after(1500, step1)
+    app.after(1400, shoot)
     app.mainloop()
-    print("Screenshots done.")
+    print("Done.")
 
 
 if __name__ == "__main__":
