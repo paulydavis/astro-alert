@@ -880,7 +880,7 @@ class AstroAlertApp(tk.Tk):
 
         try:
             site         = get_active_site(override=site_key)
-            weather_days = fetch_weather_range(site.key, site.lat, site.lon, days=14)
+            weather_days = fetch_weather_range(site.key, site.lat, site.lon, days=15)
             seeing_all   = fetch_seeing(site.key, site.lat, site.lon)
 
             seeing_by_time: dict = {}
@@ -890,7 +890,7 @@ class AstroAlertApp(tk.Tk):
                     seeing_by_time[t] = sh
 
             nights = []
-            for i, (target_date, weather) in enumerate(weather_days):
+            for i, (target_date, weather) in enumerate(weather_days[:14]):
                 moon   = get_moon_info(site.lat, site.lon, target_date)
                 window = _forecast_imaging_window(target_date, site.lat, site.lon)
 
