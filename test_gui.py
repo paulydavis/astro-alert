@@ -1103,3 +1103,36 @@ def test_chart_tab_builds():
         assert hasattr(app, "_tab_chart")
     finally:
         root.destroy()
+
+
+# ── Map widget ────────────────────────────────────────────────────────────────
+
+class TestMapWidget:
+    def test_map_widget_or_fallback_label_exists(self, app):
+        """Sites tab must have either a map widget or a fallback label."""
+        assert hasattr(app, "_map_widget") or hasattr(app, "_map_fallback_label")
+
+    def test_sites_paned_window_is_horizontal(self, app):
+        """Sites tab must use a horizontal PanedWindow."""
+        assert hasattr(app, "_sites_paned")
+        assert str(app._sites_paned.cget("orient")) == "horizontal"
+
+    def test_tree_still_exists_after_map_added(self, app):
+        """Existing site list treeview must still be present."""
+        assert hasattr(app, "_tree")
+        app._refresh_sites()
+        keys = set(app._tree.get_children())
+        assert "home" in keys
+
+    def test_sync_map_markers_does_not_raise_without_map(self, app):
+        """_sync_map_markers must be safe to call even when map is unavailable."""
+        if hasattr(app, "_map_widget"):
+            app._map_widget = None
+        app._sync_map_markers()  # must not raise
+
+    def test_refresh_sites_calls_sync_map_markers(self, app, monkeypatch):
+        """_refresh_sites must call _sync_map_markers to keep pins in sync."""
+        called = []
+        monkeypatch.setattr(app, "_sync_map_markers", lambda: called.append(1))
+        app._refresh_sites()
+        assert called, "_sync_map_markers was not called by _refresh_sites"
