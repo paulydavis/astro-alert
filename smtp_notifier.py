@@ -120,22 +120,61 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
     email_format = _clean(os.getenv("EMAIL_FORMAT", "plain"))
 
     if email_format == "html" and sites:
-        go_sites_ordered = [s for s in sites if any(r.site_name == s.name and r.score.go for r in reports)]
-        chart_site = go_sites_ordered[0] if go_sites_ordered else sites[0]
         try:
-            from chart_html import build_chart_data, render_html
-            chart_data = build_chart_data(chart_site, hours=72)
-            plain_body = "\n".join(body_lines).strip()
-            html_body  = render_html(chart_data)
-            html_body  = html_body.replace(
-                "</body>",
-                f'<pre style="font-family:monospace;color:#c9d1d9;margin-top:16px">'
-                f'{html.escape(plain_body)}</pre></body>',
-                1
-            )
-
+            import logging as _logging
+            from chart_html import build_chart_data, render_chart_fragment, render_legend_html
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
+
+            site_by_name = {s.name: s for s in sites}
+            legend_html  = render_legend_html()
+
+            moon_header = (
+                f'<p style="font-family:monospace;color:#c9d1d9;margin:16px 0 8px">'
+                f'{html.escape(moon_line)}</p>'
+            )
+
+            # Build one block per site: chart + legend + text summary
+            blocks = []
+            for report in reports:
+                site_obj = site_by_name.get(report.site_name)
+                text_lines = _format_report(report)
+                text_block = (
+                    f'<pre style="font-family:monospace;color:#c9d1d9;'
+                    f'margin:4px 0 0">{html.escape(chr(10).join(text_lines))}</pre>'
+                )
+
+                if site_obj is not None:
+                    try:
+                        chart_data    = build_chart_data(site_obj, hours=72)
+                        chart_html_frag = render_chart_fragment(chart_data)
+                    except Exception as _chart_exc:
+                        _logging.getLogger(__name__).warning(
+                            "Chart build failed for %s: %s", report.site_name, _chart_exc
+                        )
+                        chart_html_frag = (
+                            f'<p style="color:#e3b341;font-size:11px">'
+                            f'⚠ Chart unavailable: {html.escape(str(_chart_exc))}</p>'
+                        )
+                else:
+                    chart_html_frag = ""
+
+                heading = (
+                    f'<h3 style="font-family:monospace;color:#58a6ff;'
+                    f'margin:24px 0 6px">{html.escape(report.site_name)}</h3>'
+                )
+                blocks.append(heading + chart_html_frag + legend_html + text_block)
+
+            separator = '<hr style="border:none;border-top:1px solid #30363d;margin:16px 0">'
+            html_body = (
+                '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
+                '<body style="background:#0d1117;color:#c9d1d9">'
+                + moon_header
+                + separator.join(blocks)
+                + '</body></html>'
+            )
+
+            plain_body = "\n".join(body_lines).strip()
             mime_msg = MIMEMultipart("alternative")
             mime_msg["Subject"] = subject
             mime_msg["From"]    = smtp_user

@@ -187,22 +187,65 @@ _CELL_H  = 24
 _LABEL_W = 120
 
 
-def render_html(data: ChartData) -> str:
-    """Return a complete HTML document containing the 72-hour forecast table."""
+def render_legend_html() -> str:
+    """Return an HTML table snippet showing the colour scale for each chart row."""
+    sw = _CELL_W   # swatch width matches chart cell width
+    sh = 14        # swatch height
+
+    def swatch(color: str) -> str:
+        return (
+            f'<span style="display:inline-block;background:{color};'
+            f'width:{sw}px;height:{sh}px;vertical-align:middle"></span>'
+        )
+
+    arrow = '<span style="color:#8b949e;font-size:10px;margin:0 2px">→</span>'
+    lbl   = lambda t: f'<span style="font-size:9px;color:#8b949e;margin-left:3px">{t}</span>'
+
+    groups = [
+        ("Cloud / Seeing / Transp / Humidity",
+         swatch(cloud_color(0)) + lbl("Good") + arrow
+         + swatch(cloud_color(50)) + arrow
+         + swatch(cloud_color(100)) + lbl("Poor")),
+        ("Wind",
+         swatch(wind_color(0)) + lbl("Calm") + arrow
+         + swatch(wind_color(20)) + arrow
+         + swatch(wind_color(40)) + lbl("Strong")),
+        ("Temperature",
+         swatch(temperature_color(-15)) + lbl("Cold") + arrow
+         + swatch(temperature_color(5)) + lbl("Mild") + arrow
+         + swatch(temperature_color(30)) + lbl("Warm")),
+        ("Precip",
+         swatch(precipitation_color(0)) + lbl("Dry") + arrow
+         + swatch(precipitation_color(1)) + lbl("Rain")),
+        ("Moon",
+         swatch(moon_color(0)) + lbl("New") + arrow
+         + swatch(moon_color(100)) + lbl("Full")),
+        ("No data",
+         swatch(_MISSING) + lbl("—")),
+    ]
+
+    rows = "".join(
+        f'<tr>'
+        f'<td style="font-size:10px;color:#8b949e;padding-right:12px;'
+        f'white-space:nowrap;vertical-align:middle">{title}</td>'
+        f'<td style="white-space:nowrap;vertical-align:middle">{swatches}</td>'
+        f'</tr>'
+        for title, swatches in groups
+    )
+    return (
+        '<table style="border-collapse:collapse;margin:8px 0 16px;'
+        'font-family:monospace">' + rows + "</table>"
+    )
+
+
+def render_chart_fragment(data: ChartData) -> str:
+    """Return the chart table + optional error note, without any HTML document wrapper."""
     hours = len(data.cloud)
     num_days = (hours + 23) // 24
 
-    lines = [
-        "<!DOCTYPE html>",
-        '<html><head><meta charset="utf-8">',
-        f"<title>Astro Chart — {data.site_name}</title>",
-        "</head>",
-        '<body style="background:#0d1117;color:#c9d1d9;font-family:monospace">',
-        f'<h2 style="margin:16px 0 8px">{data.site_name} — 72-Hour Forecast</h2>',
-        '<table style="border-collapse:collapse;font-size:10px">',
-    ]
+    lines = ['<table style="border-collapse:collapse;font-size:10px">']
 
-    # ── Date header row ──────────────────────────────────────────────────────
+    # Date header row
     lines.append("<tr>")
     lines.append(f'<td style="width:{_LABEL_W}px"></td>')
     for day in range(num_days):
@@ -214,7 +257,7 @@ def render_html(data: ChartData) -> str:
         )
     lines.append("</tr>")
 
-    # ── Hour labels row ──────────────────────────────────────────────────────
+    # Hour labels row
     lines.append("<tr>")
     lines.append(f'<td style="width:{_LABEL_W}px"></td>')
     for i in range(hours):
@@ -225,7 +268,7 @@ def render_html(data: ChartData) -> str:
         )
     lines.append("</tr>")
 
-    # ── Data rows ────────────────────────────────────────────────────────────
+    # Data rows
     for label, field_name, color_fn, fmt_fn in _ROWS:
         values = getattr(data, field_name)
         lines.append("<tr>")
@@ -253,11 +296,27 @@ def render_html(data: ChartData) -> str:
             lines.append(f'<td title="{title}" style="{cell_style}">{text}</td>')
         lines.append("</tr>")
 
-    lines += ["</table>"]
+    lines.append("</table>")
 
     if data.errors:
         err_html = "<br>".join(data.errors)
         lines.append(f'<p style="color:#e3b341;font-size:11px">⚠ Data gaps: {err_html}</p>')
 
-    lines += ["</body></html>"]
     return "\n".join(lines)
+
+
+def render_html(data: ChartData) -> str:
+    """Return a complete HTML document containing the 72-hour forecast table and legend."""
+    import html as _html
+    fragment = render_chart_fragment(data)
+    legend   = render_legend_html()
+    return (
+        '<!DOCTYPE html>'
+        '<html><head><meta charset="utf-8">'
+        f'<title>Astro Chart — {_html.escape(data.site_name)}</title>'
+        '</head>'
+        '<body style="background:#0d1117;color:#c9d1d9;font-family:monospace">'
+        f'<h2 style="margin:16px 0 8px">{_html.escape(data.site_name)} — 72-Hour Forecast</h2>'
+        + fragment + legend +
+        '</body></html>'
+    )
