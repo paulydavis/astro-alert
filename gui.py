@@ -80,25 +80,11 @@ def _detect_ip_location() -> tuple[float, float, str]:
 
 
 def _forecast_imaging_window(target_date, lat=None, lon=None):
-    """Return the set of UTC datetimes covering sunset→sunrise for target_date's imaging night.
-
-    Falls back to 20:00–04:00 UTC if lat/lon are not provided or sun times are unavailable.
-    """
-    from datetime import datetime, timedelta, timezone
+    """Return the set of UTC datetimes covering sunset→sunrise for target_date's imaging night."""
     if lat is not None and lon is not None:
-        from moon import get_sun_times
-        sunset, sunrise = get_sun_times(lat, lon, target_date)
-        if sunset and sunrise:
-            start = sunset.replace(minute=0, second=0, microsecond=0)
-            end   = sunrise.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
-            hours = set()
-            t = start
-            while t <= end:
-                hours.add(t)
-                t += timedelta(hours=1)
-            return hours
-
-    # Fallback: fixed 20:00–04:00 UTC
+        from moon import compute_imaging_window
+        return compute_imaging_window(lat, lon, target_date)
+    from datetime import datetime, timedelta, timezone
     ev = {
         datetime(target_date.year, target_date.month, target_date.day,
                  h, tzinfo=timezone.utc)

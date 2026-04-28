@@ -108,3 +108,31 @@ def get_moon_info(lat: float, lon: float, target_date: Optional[date] = None) ->
         transit_utc=transit_utc,
         is_up_at_midnight=is_up_at_midnight,
     )
+
+
+def compute_imaging_window(lat: float, lon: float, target_date: date) -> set:
+    """Return the set of UTC hour datetimes covering sunset→sunrise for target_date.
+
+    Falls back to 20:00–04:00 UTC if sun times are unavailable (polar extremes).
+    """
+    sunset, sunrise = get_sun_times(lat, lon, target_date)
+    if sunset and sunrise:
+        start = sunset.replace(minute=0, second=0, microsecond=0)
+        end   = sunrise.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        hours: set = set()
+        t = start
+        while t <= end:
+            hours.add(t)
+            t += timedelta(hours=1)
+        return hours
+    ev = {
+        datetime(target_date.year, target_date.month, target_date.day,
+                 h, tzinfo=timezone.utc)
+        for h in range(20, 24)
+    }
+    nd = target_date + timedelta(days=1)
+    ea = {
+        datetime(nd.year, nd.month, nd.day, h, tzinfo=timezone.utc)
+        for h in range(0, 5)
+    }
+    return ev | ea
