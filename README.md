@@ -10,7 +10,7 @@ Astro Alert has a graphical control panel with seven tabs:
 
 ![Dashboard](screenshots/dashboard.png)
 
-**Sites** — add, edit, delete, and activate sites. The Add Site dialog geocodes a place name to fill coordinates automatically, fetches elevation from Open-Meteo, and links to lightpollutionmap.info for Bortle lookup.
+**Sites** — add, edit, delete, and activate sites. The tab shows your site list on the left and an interactive OpenStreetMap on the right, separated by a draggable sash. Each site appears as a pin on the map — click a pin to jump straight to the Forecast tab for that site. Click anywhere on the map to open the Add Site dialog with the clicked coordinates pre-filled. The Add Site dialog also geocodes a place name to fill coordinates automatically, fetches elevation from Open-Meteo, and links to lightpollutionmap.info for Bortle lookup.
 
 ![Sites](screenshots/sites.png)
 
