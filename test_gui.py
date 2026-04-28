@@ -121,9 +121,9 @@ class TestAppInit:
     def test_window_title(self, app):
         assert app.title() == "Astro Alert"
 
-    def test_has_notebook_with_five_tabs(self, app):
+    def test_has_notebook_with_six_tabs(self, app):
         assert hasattr(app, "_nb")
-        assert app._nb.index("end") == 5
+        assert app._nb.index("end") == 6
 
     def test_run_button_exists(self, app):
         assert hasattr(app, "_run_btn")
@@ -1074,3 +1074,23 @@ class TestSettingsTab:
         with patch("threading.Thread", side_effect=mock_thread):
             app._check_first_run()
         assert app._do_ip_detect not in started_targets
+
+
+def test_chart_tab_builds():
+    """Chart tab frame exists in notebook after app init."""
+    import tkinter as tk
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        from gui import AstroAlertApp
+        app = AstroAlertApp.__new__(AstroAlertApp)
+        tk.Tk.__init__(app)
+        app.configure(bg="#0d1117")
+        app.geometry("980x680")
+        app._setup_styles()
+        app._build_header()
+        app._build_notebook()
+        app._build_statusbar()
+        assert hasattr(app, "_tab_chart")
+    finally:
+        root.destroy()

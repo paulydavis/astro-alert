@@ -201,18 +201,21 @@ class AstroAlertApp(tk.Tk):
         self._tab_dash     = ttk.Frame(nb)
         self._tab_sites    = ttk.Frame(nb)
         self._tab_sched    = ttk.Frame(nb)
+        self._tab_chart    = ttk.Frame(nb)
         self._tab_scoring  = ttk.Frame(nb)
         self._tab_settings = ttk.Frame(nb)
 
         nb.add(self._tab_dash,     text="  Dashboard  ")
         nb.add(self._tab_sites,    text="  Sites  ")
         nb.add(self._tab_sched,    text="  Schedule  ")
+        nb.add(self._tab_chart,    text="  Chart  ")
         nb.add(self._tab_scoring,  text="  Scoring  ")
         nb.add(self._tab_settings, text="  Settings  ")
 
         self._build_dashboard(self._tab_dash)
         self._build_sites_tab(self._tab_sites)
         self._build_schedule_tab(self._tab_sched)
+        self._build_chart_tab(self._tab_chart)
         self._build_scoring_tab(self._tab_scoring)
         self._build_settings_tab(self._tab_settings)
 
@@ -562,6 +565,245 @@ class AstroAlertApp(tk.Tk):
                 self._set_status("Schedule removed.")
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
+
+    # ── Chart tab ───────────────────────────────────────────────────────────────
+
+    def _build_chart_tab(self, parent):
+        self._chart_data = None
+
+        # ── Controls row ──────────────────────────────────────────────────────
+        ctrl = ttk.Frame(parent)
+        ctrl.pack(fill="x", padx=26, pady=(20, 0))
+
+        ttk.Label(ctrl, text="Site:", style="Dim.TLabel").pack(side="left")
+        self._chart_site_var   = tk.StringVar(value="")
+        self._chart_site_combo = ttk.Combobox(ctrl, textvariable=self._chart_site_var,
+                                               state="readonly", width=24,
+                                               font=(FONT_PROP, 12))
+        self._chart_site_combo.pack(side="left", padx=(8, 0))
+
+        self._chart_load_btn = ttk.Button(ctrl, text="Load Chart",
+                                           style="Accent.TButton",
+                                           command=self._start_chart_load)
+        self._chart_load_btn.pack(side="left", padx=(16, 0))
+
+        self._chart_error_var = tk.StringVar(value="")
+        self._chart_error_lbl = ttk.Label(ctrl, textvariable=self._chart_error_var,
+                                           style="Dim.TLabel", foreground=WARN_CLR)
+        self._chart_error_lbl.pack(side="left", padx=(16, 0))
+
+        ttk.Separator(parent).pack(fill="x", pady=(14, 0))
+
+        # ── Canvas + scrollbars ───────────────────────────────────────────────
+        frame = ttk.Frame(parent)
+        frame.pack(fill="both", expand=True)
+
+        self._chart_canvas = tk.Canvas(frame, bg=BG, highlightthickness=0)
+        hbar = ttk.Scrollbar(frame, orient="horizontal",
+                              command=self._chart_canvas.xview)
+        vbar = ttk.Scrollbar(frame, orient="vertical",
+                              command=self._chart_canvas.yview)
+        self._chart_canvas.configure(xscrollcommand=hbar.set,
+                                      yscrollcommand=vbar.set)
+        hbar.pack(side="bottom", fill="x")
+        vbar.pack(side="right",  fill="y")
+        self._chart_canvas.pack(side="left", fill="both", expand=True)
+
+        # Hover tooltip
+        self._chart_tooltip_lbl = tk.Label(
+            self, bg="#ffffe0", fg="#000000",
+            font=(FONT_MONO, 10), relief="solid", borderwidth=1,
+            padx=6, pady=3, justify="left",
+        )
+        self._chart_canvas.bind("<Motion>", self._on_chart_motion)
+        self._chart_canvas.bind("<Leave>",  lambda _e: self._chart_tooltip_lbl.place_forget())
+
+        # Mouse-wheel horizontal scroll
+        def _on_chart_wheel(e):
+            delta = e.delta
+            if sys.platform != "darwin":
+                delta = delta // 120
+            self._chart_canvas.xview_scroll(int(-1 * delta), "units")
+        self._chart_canvas.bind("<Enter>", lambda _e: (
+            self._chart_canvas.bind_all("<MouseWheel>", _on_chart_wheel),
+            self._chart_canvas.bind_all("<Button-4>",
+                lambda ev: self._chart_canvas.xview_scroll(-1, "units")),
+            self._chart_canvas.bind_all("<Button-5>",
+                lambda ev: self._chart_canvas.xview_scroll(1, "units")),
+        ))
+        self._chart_canvas.bind("<Leave>", lambda _e: (
+            self._chart_canvas.unbind_all("<MouseWheel>"),
+            self._chart_canvas.unbind_all("<Button-4>"),
+            self._chart_canvas.unbind_all("<Button-5>"),
+            self._chart_tooltip_lbl.place_forget(),
+        ))
+
+        self.after(150, self._refresh_chart_sites)
+
+    def _refresh_chart_sites(self):
+        if not hasattr(self, "_chart_site_combo"):
+            return
+        try:
+            from site_manager import list_sites
+            entries = list_sites()
+        except FileNotFoundError:
+            entries = []
+        options = [f"{k}: {s.name}" for k, s, _ in entries]
+        self._chart_site_combo.configure(values=options)
+        if options and not self._chart_site_var.get():
+            self._chart_site_var.set(options[0])
+
+    def _start_chart_load(self):
+        site_val = self._chart_site_var.get()
+        if not site_val:
+            return
+        self._chart_load_btn.configure(state="disabled", text="Loading…")
+        self._chart_error_var.set("")
+        self._chart_canvas.delete("all")
+        self._chart_data = None
+        key = site_val.split(":")[0].strip()
+        threading.Thread(target=self._run_chart_load, args=(key,), daemon=True).start()
+
+    def _run_chart_load(self, site_key: str):
+        from site_manager import get_active_site
+        from chart_html import build_chart_data
+        try:
+            site = get_active_site(override=site_key)
+            data = build_chart_data(site, hours=72)
+            self.after(0, self._chart_loaded, data)
+        except Exception as e:
+            self.after(0, self._chart_load_failed, str(e))
+
+    def _chart_loaded(self, data):
+        self._chart_data = data
+        self._chart_load_btn.configure(state="normal", text="Load Chart")
+        if data.errors:
+            self._chart_error_var.set("⚠ " + " / ".join(data.errors))
+        self._draw_chart(data)
+        self._set_status("Chart loaded.")
+
+    def _chart_load_failed(self, msg: str):
+        self._chart_load_btn.configure(state="normal", text="Load Chart")
+        self._chart_error_var.set(f"Error: {msg}")
+        self._set_status("Chart load failed.")
+
+    def _draw_chart(self, data):
+        from chart_html import (cloud_color, seeing_color, transparency_color,
+                                 wind_color, humidity_color, temperature_color,
+                                 precipitation_color, moon_color, _MISSING)
+        from datetime import timedelta
+
+        canvas = self._chart_canvas
+        canvas.delete("all")
+
+        LABEL_W  = 130
+        HEADER_H = 52   # date row (26px) + hour row (26px)
+        CELL_W   = 18
+        CELL_H   = 28
+        hours    = len(data.cloud)
+
+        ROW_DEFS = [
+            ("Cloud Cover",  data.cloud,         cloud_color,         lambda v: f"{v}%"),
+            ("Seeing",       data.seeing,        seeing_color,        lambda v: f"{v:.0f}/8"),
+            ("Transparency", data.transparency,  transparency_color,  lambda v: f"{v:.0f}/8"),
+            ("Wind",         data.wind,          wind_color,          lambda v: f"{v:.0f} km/h"),
+            ("Humidity",     data.humidity,      humidity_color,      lambda v: f"{v}%"),
+            ("Temperature",  data.temperature,   temperature_color,   lambda v: f"{v:.1f}°C"),
+            ("Precip",       data.precipitation, precipitation_color, lambda v: f"{v:.1f} mm"),
+            ("Moon",         data.moon_pct,      moon_color,          lambda v: f"{v}%"),
+        ]
+
+        total_w = LABEL_W + hours * CELL_W + 20
+        total_h = HEADER_H + len(ROW_DEFS) * CELL_H + 20
+        canvas.configure(scrollregion=(0, 0, total_w, total_h))
+
+        # ── Date headers ──────────────────────────────────────────────────────
+        for day in range(3):
+            dt = data.start_dt + timedelta(hours=day * 24)
+            label = dt.strftime("%a %b %-d")
+            x = LABEL_W + day * 24 * CELL_W + 12 * CELL_W
+            canvas.create_text(x, 13, text=label, fill=ACCENT,
+                               font=(FONT_PROP, 10, "bold"), anchor="center")
+
+        # ── Hour labels ───────────────────────────────────────────────────────
+        for i in range(hours):
+            if i % 3 == 0:
+                h = i % 24
+                x = LABEL_W + i * CELL_W + CELL_W // 2
+                canvas.create_text(x, 38, text=f"{h:02d}", fill=TEXT_DIM,
+                                   font=(FONT_MONO, 8), anchor="center")
+
+        # ── Data rows ─────────────────────────────────────────────────────────
+        for row_idx, (label, values, color_fn, _fmt) in enumerate(ROW_DEFS):
+            y0 = HEADER_H + row_idx * CELL_H
+
+            # Row label
+            canvas.create_text(LABEL_W - 8, y0 + CELL_H // 2,
+                               text=label, fill=TEXT_DIM,
+                               font=(FONT_PROP, 10), anchor="e")
+
+            # Cells
+            for col_idx, val in enumerate(values):
+                x0 = LABEL_W + col_idx * CELL_W
+                bg = _MISSING if val is None else color_fn(val)
+                canvas.create_rectangle(x0, y0, x0 + CELL_W, y0 + CELL_H,
+                                        fill=bg, outline="", width=0)
+
+                # Moon rise/set symbols
+                if label == "Moon" and col_idx in data.moon_events:
+                    sym = "▲" if data.moon_events[col_idx] == "rise" else "▼"
+                    canvas.create_text(x0 + CELL_W // 2, y0 + CELL_H // 2,
+                                       text=sym, fill="#ffffff",
+                                       font=(FONT_PROP, 8))
+
+    def _on_chart_motion(self, event):
+        from datetime import timedelta
+
+        data = self._chart_data
+        if data is None:
+            return
+
+        cx = self._chart_canvas.canvasx(event.x)
+        cy = self._chart_canvas.canvasy(event.y)
+
+        LABEL_W  = 130
+        HEADER_H = 52
+        CELL_W   = 18
+        CELL_H   = 28
+
+        col = int((cx - LABEL_W) / CELL_W)
+        row = int((cy - HEADER_H) / CELL_H)
+
+        ROW_FIELDS = ["cloud", "seeing", "transparency", "wind",
+                      "humidity", "temperature", "precipitation", "moon_pct"]
+        ROW_LABELS = ["Cloud Cover", "Seeing", "Transparency", "Wind",
+                      "Humidity", "Temperature", "Precip", "Moon"]
+        ROW_FMTS   = [
+            lambda v: f"{v}%",
+            lambda v: f"{v:.0f}/8",
+            lambda v: f"{v:.0f}/8",
+            lambda v: f"{v:.0f} km/h",
+            lambda v: f"{v}%",
+            lambda v: f"{v:.1f}°C",
+            lambda v: f"{v:.1f} mm",
+            lambda v: f"{v}%",
+        ]
+
+        if col < 0 or col >= 72 or row < 0 or row >= len(ROW_FIELDS):
+            self._chart_tooltip_lbl.place_forget()
+            return
+
+        val = getattr(data, ROW_FIELDS[row])[col]
+        label = ROW_LABELS[row]
+        dt = data.start_dt + timedelta(hours=col)
+        time_str = dt.strftime("%a %H:00 UTC")
+
+        tip = f"{label}\n{time_str}\n" + ("N/A" if val is None else ROW_FMTS[row](val))
+        self._chart_tooltip_lbl.configure(text=tip)
+        tx = event.x_root - self.winfo_rootx() + 14
+        ty = event.y_root - self.winfo_rooty() + 14
+        self._chart_tooltip_lbl.place(x=tx, y=ty)
+        self._chart_tooltip_lbl.lift()
 
     # ── Scoring tab ─────────────────────────────────────────────────────────────
 
