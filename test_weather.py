@@ -176,3 +176,84 @@ def test_fetch_weather_three_day_range():
     assert result.hours[71].cloud_cover_pct == 10
     params = mock_get.call_args[1]["params"]
     assert params["end_date"] == "2026-05-03"
+
+
+# --- 14-night range ----------------------------------------------------------
+
+class TestFetchWeatherRange:
+    def test_returns_14_tuples(self):
+        """fetch_weather_range returns one (date, WeatherResult) per day."""
+        today = datetime.now(timezone.utc).date()
+        times = [
+            (datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+             + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00")
+            for i in range(14 * 24)
+        ]
+        fake_data = {
+            "hourly": {
+                "time": times,
+                "cloud_cover": [10] * (14 * 24),
+                "precipitation": [0.0] * (14 * 24),
+                "wind_speed_10m": [5.0] * (14 * 24),
+                "relative_humidity_2m": [50] * (14 * 24),
+                "dew_point_2m": [5.0] * (14 * 24),
+                "temperature_2m": [15.0] * (14 * 24),
+            }
+        }
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = fake_data
+        mock_resp.raise_for_status = MagicMock()
+
+        from weather import fetch_weather_range
+        with patch("weather.requests.get", return_value=mock_resp):
+            results = fetch_weather_range("test", 35.9, -79.0, days=14)
+
+        assert len(results) == 14
+        for i, (d, wr) in enumerate(results):
+            assert d == today + timedelta(days=i)
+            assert wr.ok
+            assert len(wr.hours) == 24
+
+    def test_each_result_contains_only_its_own_date_hours(self):
+        """Hours in each WeatherResult all belong to that result's date."""
+        today = datetime.now(timezone.utc).date()
+        times = [
+            (datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+             + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00")
+            for i in range(14 * 24)
+        ]
+        fake_data = {
+            "hourly": {
+                "time": times,
+                "cloud_cover": list(range(14 * 24)),
+                "precipitation": [0.0] * (14 * 24),
+                "wind_speed_10m": [5.0] * (14 * 24),
+                "relative_humidity_2m": [50] * (14 * 24),
+                "dew_point_2m": [5.0] * (14 * 24),
+                "temperature_2m": [15.0] * (14 * 24),
+            }
+        }
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = fake_data
+        mock_resp.raise_for_status = MagicMock()
+
+        from weather import fetch_weather_range
+        with patch("weather.requests.get", return_value=mock_resp):
+            results = fetch_weather_range("test", 35.9, -79.0, days=14)
+
+        _, day0 = results[0]
+        assert all(h.time.date() == today for h in day0.hours)
+        _, day1 = results[1]
+        assert all(h.time.date() == today + timedelta(days=1) for h in day1.hours)
+
+    def test_api_error_returns_14_error_results(self):
+        """API failure propagates an error WeatherResult for every day — never raises."""
+        from weather import fetch_weather_range
+        with patch("weather.requests.get",
+                   side_effect=requests.ConnectionError("timeout")):
+            results = fetch_weather_range("test", 35.9, -79.0, days=14)
+
+        assert len(results) == 14
+        for _, wr in results:
+            assert not wr.ok
+            assert wr.hours == []

@@ -89,3 +89,35 @@ def fetch_weather(site_key: str, lat: float, lon: float, target_date: Optional[d
         return WeatherResult(site_key=site_key, fetched_at=fetched_at, hours=[], error=f"Parse error: {e}")
 
     return WeatherResult(site_key=site_key, fetched_at=fetched_at, hours=hours)
+
+
+def fetch_weather_range(site_key: str, lat: float, lon: float,
+                        days: int = 14) -> list[tuple[date, "WeatherResult"]]:
+    """Fetch hourly weather for `days` days starting from today UTC.
+
+    Makes one Open-Meteo API call; partitions the result by calendar date.
+    Returns a list of (date, WeatherResult) tuples — always `days` entries.
+    """
+    today = datetime.now(timezone.utc).date()
+    end = today + timedelta(days=days - 1)
+    raw = fetch_weather(site_key, lat, lon, target_date=today, end_date=end)
+
+    if not raw.ok:
+        return [
+            (today + timedelta(days=i),
+             WeatherResult(site_key=site_key, fetched_at=raw.fetched_at,
+                           hours=[], error=raw.error))
+            for i in range(days)
+        ]
+
+    by_date: dict[date, list] = {}
+    for h in raw.hours:
+        d = h.time.date()
+        by_date.setdefault(d, []).append(h)
+
+    return [
+        (today + timedelta(days=i),
+         WeatherResult(site_key=site_key, fetched_at=raw.fetched_at,
+                       hours=by_date.get(today + timedelta(days=i), [])))
+        for i in range(days)
+    ]
