@@ -4,7 +4,7 @@ Go/no-go email alert system for astrophotography sessions. Fetches weather, atmo
 
 ## GUI
 
-Astro Alert has a graphical control panel with five tabs:
+Astro Alert has a graphical control panel with seven tabs:
 
 **Dashboard** — run a dry-run or live forecast for any site, with colour-coded GO/NO-GO output.
 
@@ -19,6 +19,14 @@ Astro Alert has a graphical control panel with five tabs:
 **Schedule** — set up the two automatic daily emails with one click. Astro Alert runs itself in the background every day — no need to remember to open it.
 
 ![Schedule](screenshots/schedule.png)
+
+**Forecast** — 14-night outlook for any site. Each night shows a GO/NO-GO verdict, total score, average cloud cover, and moon illumination. Click a row to expand a detail panel with the full breakdown and seeing notes.
+
+![Forecast](screenshots/forecast.png)
+
+**Chart** — 72-hour colour-coded heatmap of cloud cover, seeing, transparency, wind, humidity, temperature, precipitation, and moon phase — one column per hour, scrollable. Hover any cell for the exact value. A colour legend explains the scale for each row.
+
+![Chart](screenshots/chart.png)
 
 **Scoring** — adjust how much each factor (weather, seeing, moon) contributes to the go/no-go score. Sliders for all top-level and sub-weights; changes persist across sessions and are picked up by the next forecast run.
 
@@ -336,11 +344,12 @@ Sites are listed in drive-time order (shortest first). The subject line calls ou
 astro_alert/
 ├── main.py              # Entry point: GUI when run bare, CLI when run with args
 ├── astro_alert.py       # CLI entry point and argument parser
-├── gui.py               # Tkinter GUI (dashboard, sites, schedule, scoring, settings)
+├── gui.py               # Tkinter GUI (dashboard, sites, schedule, forecast, chart, scoring, settings)
 ├── data_dir.py          # Platform-aware user data directory
 ├── scheduler_setup.py   # Cross-platform cron / Task Scheduler install
 ├── site_manager.py      # Load/save sites.json
-├── weather.py           # Open-Meteo weather fetch
+├── chart_html.py        # 72-hour chart data model, color functions, HTML render
+├── weather.py           # Open-Meteo weather fetch (single night + 14-day range)
 ├── seeing.py            # 7timer.info seeing/transparency fetch
 ├── moon.py              # Moon phase and rise/set via ephem
 ├── scorer.py            # Bortle-aware 0–100 scoring with configurable weights
