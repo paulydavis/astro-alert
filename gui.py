@@ -652,7 +652,7 @@ class AstroAlertApp(tk.Tk):
         self._forecast_detail_pane = ttk.Frame(parent, style="Card.TFrame")
 
         detail_inner = ttk.Frame(self._forecast_detail_pane, style="Card.TFrame")
-        detail_inner.pack(fill="both", expand=True, padx=26, pady=12)
+        detail_inner.pack(fill="x", padx=26, pady=12)
 
         left = ttk.Frame(detail_inner, style="Card.TFrame")
         left.pack(side="left", fill="both", expand=True)
@@ -684,6 +684,40 @@ class AstroAlertApp(tk.Tk):
             padx=4, pady=4,
         )
         self._detail_hours_txt.pack(anchor="w")
+
+        # ── Targets section (hidden until a GO night is selected) ─────────────
+        self._target_section_sep   = ttk.Separator(self._forecast_detail_pane)
+        self._target_section_frame = ttk.Frame(self._forecast_detail_pane,
+                                                style="Card.TFrame")
+
+        ttk.Label(self._target_section_frame,
+                  text="Recommended Targets",
+                  style="CardDim.TLabel").pack(anchor="w", padx=26, pady=(8, 4))
+
+        target_cols = ("name", "common_name", "type", "peak_alt",
+                       "hrs_vis", "transits", "description")
+        self._target_tree = ttk.Treeview(
+            self._target_section_frame,
+            columns=target_cols, show="headings",
+            height=8, selectmode="none",
+        )
+        self._target_tree.heading("name",        text="Name")
+        self._target_tree.heading("common_name", text="Common Name")
+        self._target_tree.heading("type",        text="Type")
+        self._target_tree.heading("peak_alt",    text="Peak Alt")
+        self._target_tree.heading("hrs_vis",     text="Hrs Vis")
+        self._target_tree.heading("transits",    text="Transits")
+        self._target_tree.heading("description", text="Description")
+
+        self._target_tree.column("name",        width=75,  anchor="w")
+        self._target_tree.column("common_name", width=155, anchor="w")
+        self._target_tree.column("type",        width=130, anchor="w")
+        self._target_tree.column("peak_alt",    width=65,  anchor="center")
+        self._target_tree.column("hrs_vis",     width=55,  anchor="center")
+        self._target_tree.column("transits",    width=70,  anchor="center")
+        self._target_tree.column("description", width=0,   anchor="w", stretch=True)
+
+        self._target_tree.pack(fill="both", expand=True, padx=26, pady=(0, 12))
 
         self.after(150, self._refresh_forecast_sites)
 
@@ -718,6 +752,7 @@ class AstroAlertApp(tk.Tk):
         from seeing import fetch_seeing, SeeingResult
         from moon import get_moon_info
         from scorer import score_night
+        from target_recommender import get_nightly_targets
 
         try:
             site         = get_active_site(override=site_key)
@@ -766,6 +801,7 @@ class AstroAlertApp(tk.Tk):
                     [h for h in combined_weather_hours if h.time in window],
                     key=lambda h: h.time,
                 )
+                targets = get_nightly_targets(site.lat, site.lon, window) if score.go else []
                 nights.append({
                     "date":             target_date,
                     "score":            score,
@@ -776,6 +812,7 @@ class AstroAlertApp(tk.Tk):
                     "lon":              site.lon,
                     "window_hours":     window_hours,
                     "timezone":         site.timezone,
+                    "targets":          targets,
                 })
 
             self.after(0, self._forecast_loaded, nights)
@@ -892,6 +929,31 @@ class AstroAlertApp(tk.Tk):
                 )
 
         self._detail_hours_txt.configure(state="disabled")
+
+        targets = night.get("targets", [])
+        if targets:
+            self._target_section_sep.pack(fill="x")
+            self._target_section_frame.pack(fill="both", expand=True)
+            self._target_tree.delete(*self._target_tree.get_children())
+            for t in targets:
+                if t.transit_utc and local_tz:
+                    transit_str = _local(t.transit_utc).strftime("%H:%M")
+                elif t.transit_utc:
+                    transit_str = t.transit_utc.strftime("%H:%M")
+                else:
+                    transit_str = "—"
+                self._target_tree.insert("", "end", values=(
+                    t.name,
+                    t.common_name,
+                    t.type,
+                    f"{t.peak_alt_deg:.0f}°",
+                    f"{t.hours_visible:.0f}h",
+                    transit_str,
+                    t.description,
+                ))
+        else:
+            self._target_section_sep.pack_forget()
+            self._target_section_frame.pack_forget()
 
     # ── Chart tab ───────────────────────────────────────────────────────────────
 

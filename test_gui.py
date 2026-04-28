@@ -156,6 +156,9 @@ class TestAppInit:
         assert hasattr(app, "_sched_title")
         assert hasattr(app, "_sched_detail")
 
+    def test_forecast_target_tree_exists(self, app):
+        assert hasattr(app, "_target_tree")
+
 
 # ── AstroAlertApp: _refresh_sites ─────────────────────────────────────────────
 
