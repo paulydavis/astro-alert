@@ -467,6 +467,7 @@ class AstroAlertApp(tk.Tk):
             try:
                 entries = list_sites()
             except FileNotFoundError:
+                self._sync_map_markers()
                 return
             for key, site, is_active in entries:
                 drive  = f"{site.drive_min} min" if site.drive_min else "—"
@@ -505,7 +506,7 @@ class AstroAlertApp(tk.Tk):
             label = f"{site.name}  (Bortle {site.bortle})"
             self._map_widget.set_marker(
                 site.lat, site.lon, text=label,
-                command=lambda m, k=key: self._on_map_marker_click(k),
+                command=lambda m, k=key: self._on_map_marker_click(k),  # m absorbs marker obj
             )
         if len(entries) == 1:
             self._map_widget.set_position(lats[0], lons[0], zoom=10)
@@ -519,6 +520,8 @@ class AstroAlertApp(tk.Tk):
     def _on_map_marker_click(self, site_key: str):
         """Switch to Forecast tab and select the given site."""
         self._nb.select(self._tab_forecast)
+        if not hasattr(self, "_site_combo"):
+            return
         target_option = next(
             (opt for opt in self._site_combo.cget("values")
              if opt.startswith(f"{site_key}:")),
