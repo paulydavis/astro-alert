@@ -414,6 +414,7 @@ class AstroAlertApp(tk.Tk):
         self._tree.configure(yscrollcommand=vsb.set)
         self._tree.pack(side="left", fill="both", expand=True, padx=(18, 0), pady=16)
         vsb.pack(side="left", fill="y", pady=16)
+        self._tree.bind("<<TreeviewSelect>>", lambda _: self._sync_map_markers())
 
         btns = ttk.Frame(left)
         btns.pack(side="right", fill="y", padx=16, pady=16)
@@ -489,7 +490,7 @@ class AstroAlertApp(tk.Tk):
         self._sync_map_markers()
 
     def _sync_map_markers(self):
-        """Clear and redraw all site pins on the map."""
+        """Clear and redraw site pins. If a row is selected, show only that site + active site."""
         if not getattr(self, "_map_widget", None):
             return
         self._map_widget.delete_all_marker()
@@ -500,15 +501,26 @@ class AstroAlertApp(tk.Tk):
         if not entries:
             self._map_widget.set_position(39.0, -95.0, zoom=4)
             return
-        lats = [s.lat for _, s, _ in entries]
-        lons = [s.lon for _, s, _ in entries]
-        for key, site, _ in entries:
+
+        sel = self._tree.selection() if hasattr(self, "_tree") else ()
+        selected_key = sel[0] if sel else None
+        active_key = next((k for k, _, is_active in entries if is_active), None)
+        show_keys = (
+            {selected_key, active_key} - {None}
+            if selected_key and selected_key != active_key
+            else None  # None means show all
+        )
+
+        visible = [(k, s) for k, s, _ in entries if show_keys is None or k in show_keys]
+        for key, site in visible:
             label = f"{site.name}  (Bortle {site.bortle})"
             self._map_widget.set_marker(
                 site.lat, site.lon, text=label,
                 command=lambda m, k=key: self._on_map_marker_click(k),  # m absorbs marker obj
             )
-        if len(entries) == 1:
+        lats = [s.lat for _, s in visible]
+        lons = [s.lon for _, s in visible]
+        if len(visible) == 1:
             self._map_widget.set_position(lats[0], lons[0], zoom=10)
         else:
             padding = 0.5
