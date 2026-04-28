@@ -16,6 +16,44 @@ class MoonInfo:
     is_up_at_midnight: bool
 
 
+def get_sun_times(lat: float, lon: float, target_date: date) -> tuple[Optional[datetime], Optional[datetime]]:
+    """Return (sunset_utc, sunrise_utc) for the night starting on target_date.
+
+    Searches for the next sunset after local noon, then the next sunrise after that.
+    Returns (None, None) on polar extremes where the sun never sets or rises.
+    """
+    obs = ephem.Observer()
+    obs.lat = str(lat)
+    obs.lon = str(lon)
+    obs.pressure = 0
+    obs.horizon = "-0:34"
+
+    def _to_utc(ephem_date) -> Optional[datetime]:
+        if ephem_date is None:
+            return None
+        return datetime.strptime(str(ephem_date), "%Y/%m/%d %H:%M:%S").replace(tzinfo=timezone.utc)
+
+    noon = datetime(target_date.year, target_date.month, target_date.day, 12, 0, 0)
+    obs.date = ephem.Date(noon)
+    sun = ephem.Sun()
+
+    try:
+        sunset_utc = _to_utc(obs.next_setting(sun))
+    except (ephem.NeverUpError, ephem.AlwaysUpError):
+        return None, None
+
+    if sunset_utc is None:
+        return None, None
+
+    obs.date = ephem.Date(sunset_utc.replace(tzinfo=None))
+    try:
+        sunrise_utc = _to_utc(obs.next_rising(sun))
+    except (ephem.NeverUpError, ephem.AlwaysUpError):
+        sunrise_utc = None
+
+    return sunset_utc, sunrise_utc
+
+
 def get_moon_info(lat: float, lon: float, target_date: Optional[date] = None) -> MoonInfo:
     """Compute moon phase and rise/set for lat/lon on target_date (default: today UTC)."""
     if target_date is None:

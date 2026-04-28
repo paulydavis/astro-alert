@@ -79,9 +79,26 @@ def _detect_ip_location() -> tuple[float, float, str]:
     return float(data["lat"]), float(data["lon"]), f"{data['city']}, {data['regionName']}"
 
 
-def _forecast_imaging_window(target_date):
-    """Return the set of UTC datetimes covering 20:00–04:00 for target_date's imaging night."""
+def _forecast_imaging_window(target_date, lat=None, lon=None):
+    """Return the set of UTC datetimes covering sunset→sunrise for target_date's imaging night.
+
+    Falls back to 20:00–04:00 UTC if lat/lon are not provided or sun times are unavailable.
+    """
     from datetime import datetime, timedelta, timezone
+    if lat is not None and lon is not None:
+        from moon import get_sun_times
+        sunset, sunrise = get_sun_times(lat, lon, target_date)
+        if sunset and sunrise:
+            start = sunset.replace(minute=0, second=0, microsecond=0)
+            end   = sunrise.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+            hours = set()
+            t = start
+            while t <= end:
+                hours.add(t)
+                t += timedelta(hours=1)
+            return hours
+
+    # Fallback: fixed 20:00–04:00 UTC
     ev = {
         datetime(target_date.year, target_date.month, target_date.day,
                  h, tzinfo=timezone.utc)
@@ -673,7 +690,7 @@ class AstroAlertApp(tk.Tk):
         right = ttk.Frame(detail_inner, style="Card.TFrame")
         right.pack(side="left", fill="both", expand=True)
 
-        ttk.Label(right, text="Imaging Window  (20:00–04:00 UTC)",
+        ttk.Label(right, text="Imaging Window  (sunset → sunrise, local time)",
                   style="CardDim.TLabel").pack(anchor="w", pady=(8, 4))
         self._detail_hours_txt = tk.Text(
             right, bg=CARD, fg=TEXT, font=(FONT_MONO, 11),
@@ -728,9 +745,15 @@ class AstroAlertApp(tk.Tk):
                     seeing_by_time[t] = sh
 
             nights = []
-            for target_date, weather in weather_days:
+            for i, (target_date, weather) in enumerate(weather_days):
                 moon   = get_moon_info(site.lat, site.lon, target_date)
-                window = _forecast_imaging_window(target_date)
+                window = _forecast_imaging_window(target_date, site.lat, site.lon)
+
+                # Combine this day's and next day's weather hours so the window
+                # can span midnight (sunset often falls on the next UTC date).
+                combined_weather_hours = list(weather.hours)
+                if i + 1 < len(weather_days):
+                    combined_weather_hours.extend(weather_days[i + 1][1].hours)
 
                 night_seeing_hours = [seeing_by_time[t] for t in window
                                        if t in seeing_by_time]
@@ -753,12 +776,20 @@ class AstroAlertApp(tk.Tk):
                     seeing_available = False
 
                 score = score_night(weather, night_seeing, moon, site.bortle, target_date)
+                window_hours = sorted(
+                    [h for h in combined_weather_hours if h.time in window],
+                    key=lambda h: h.time,
+                )
                 nights.append({
                     "date":             target_date,
                     "score":            score,
                     "moon":             moon,
                     "weather":          weather,
                     "seeing_available": seeing_available,
+                    "lat":              site.lat,
+                    "lon":              site.lon,
+                    "window_hours":     window_hours,
+                    "timezone":         site.timezone,
                 })
 
             self.after(0, self._forecast_loaded, nights)
@@ -841,31 +872,38 @@ class AstroAlertApp(tk.Tk):
         self._detail_hours_txt.configure(state="normal")
         self._detail_hours_txt.delete("1.0", "end")
 
+        night_rows = night.get("window_hours", [])
+        tz_name    = night.get("timezone", "UTC")
+        try:
+            from zoneinfo import ZoneInfo
+            local_tz = ZoneInfo(tz_name)
+        except Exception:
+            local_tz = None
+
+        def _local(dt):
+            if local_tz:
+                return dt.astimezone(local_tz)
+            return dt
+
         if not weather.ok or not weather.hours:
             self._detail_hours_txt.insert("end", "Weather data unavailable.")
+        elif not night_rows:
+            self._detail_hours_txt.insert("end", "No hours in imaging window.")
         else:
-            window = _forecast_imaging_window(target_date)
-
-            night_rows = sorted(
-                [h for h in weather.hours if h.time in window],
-                key=lambda h: h.time,
-            )
-
+            tz_label = tz_name.split("/")[-1].replace("_", " ") if local_tz else "UTC"
             self._detail_hours_txt.insert(
-                "end", f"{'Hour':>5}  {'Clouds':>6}  {'Wind':>7}  {'Humidity':>8}\n")
-            self._detail_hours_txt.insert("end", "─" * 36 + "\n")
+                "end", f"{'Hour (' + tz_label + ')':>14}  {'Clouds':>6}  {'Wind':>7}  {'Humidity':>8}\n")
+            self._detail_hours_txt.insert("end", "─" * 44 + "\n")
 
             for h in night_rows:
+                local_t = _local(h.time)
                 self._detail_hours_txt.insert(
                     "end",
-                    f"{h.time.strftime('%H:00'):>5}  "
+                    f"{local_t.strftime('%a %H:00'):>14}  "
                     f"{h.cloud_cover_pct:>5}%  "
                     f"{h.wind_speed_kmh:>5.0f}km/h  "
                     f"{h.humidity_pct:>6}%\n",
                 )
-
-            if not night_rows:
-                self._detail_hours_txt.insert("end", "No hours in imaging window.")
 
         self._detail_hours_txt.configure(state="disabled")
 
