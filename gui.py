@@ -447,8 +447,18 @@ class AstroAlertApp(tk.Tk):
             self._map_fallback_label.pack(expand=True)
 
     def _on_map_click(self, coords):
-        """Handle a left-click on the map (stub — wired up in Task 5)."""
-        pass
+        """Open Add Site dialog with lat/lon pre-filled from map click."""
+        lat, lon = coords
+        dlg = SiteDialog(self, title="Add Site",
+                         prefill_lat=lat, prefill_lon=lon)
+        self.wait_window(dlg)
+        if dlg.result:
+            try:
+                add_site(**dlg.result)
+                self._refresh_sites()
+                self._set_status(f"Site '{dlg.result['key']}' added.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e), parent=self)
 
     def _refresh_sites(self):
         if hasattr(self, "_tree"):
@@ -474,6 +484,48 @@ class AstroAlertApp(tk.Tk):
             self._site_combo.configure(values=options)
             if self._site_var.get() not in options:
                 self._site_var.set("All sites")
+
+        self._sync_map_markers()
+
+    def _sync_map_markers(self):
+        """Clear and redraw all site pins on the map."""
+        if not getattr(self, "_map_widget", None):
+            return
+        self._map_widget.delete_all_marker()
+        try:
+            entries = list_sites()
+        except FileNotFoundError:
+            return
+        if not entries:
+            self._map_widget.set_position(39.0, -95.0, zoom=4)
+            return
+        lats = [s.lat for _, s, _ in entries]
+        lons = [s.lon for _, s, _ in entries]
+        for key, site, _ in entries:
+            label = f"{site.name}  (Bortle {site.bortle})"
+            self._map_widget.set_marker(
+                site.lat, site.lon, text=label,
+                command=lambda m, k=key: self._on_map_marker_click(k),
+            )
+        if len(entries) == 1:
+            self._map_widget.set_position(lats[0], lons[0], zoom=10)
+        else:
+            padding = 0.5
+            self._map_widget.fit_bounding_box(
+                (max(lats) + padding, min(lons) - padding),
+                (min(lats) - padding, max(lons) + padding),
+            )
+
+    def _on_map_marker_click(self, site_key: str):
+        """Switch to Forecast tab and select the given site."""
+        self._nb.select(self._tab_forecast)
+        target_option = next(
+            (opt for opt in self._site_combo.cget("values")
+             if opt.startswith(f"{site_key}:")),
+            None,
+        )
+        if target_option:
+            self._site_var.set(target_option)
 
     def _add_site_dialog(self):
         dlg = SiteDialog(self, title="Add Site")
