@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from weather import fetch_weather, WeatherResult
+from weather import fetch_weather, fetch_weather_range, WeatherResult
 
 LAT, LON = 35.994, -78.899
 SITE = "test"
@@ -204,7 +204,6 @@ class TestFetchWeatherRange:
         mock_resp.json.return_value = fake_data
         mock_resp.raise_for_status = MagicMock()
 
-        from weather import fetch_weather_range
         with patch("weather.requests.get", return_value=mock_resp):
             results = fetch_weather_range("test", 35.9, -79.0, days=14)
 
@@ -237,7 +236,6 @@ class TestFetchWeatherRange:
         mock_resp.json.return_value = fake_data
         mock_resp.raise_for_status = MagicMock()
 
-        from weather import fetch_weather_range
         with patch("weather.requests.get", return_value=mock_resp):
             results = fetch_weather_range("test", 35.9, -79.0, days=14)
 

@@ -92,7 +92,7 @@ def fetch_weather(site_key: str, lat: float, lon: float, target_date: Optional[d
 
 
 def fetch_weather_range(site_key: str, lat: float, lon: float,
-                        days: int = 14) -> list[tuple[date, "WeatherResult"]]:
+                        days: int = 14) -> list[tuple[date, WeatherResult]]:
     """Fetch hourly weather for `days` days starting from today UTC.
 
     Makes one Open-Meteo API call; partitions the result by calendar date.
