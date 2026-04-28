@@ -296,6 +296,30 @@ python3 astro_alert.py add-site my_spot "My Dark Spot" 35.5 -79.2 150 3 America/
 
 **Subject:** `Astro Alert tomorrow night — GO: Bladen Lakes State Forest (57/100)`
 
+The subject line calls out the best GO site, or the highest-scoring site if everything is NO-GO. Sites are listed in drive-time order (shortest first).
+
+### HTML email (recommended)
+
+When **Email Format** is set to **HTML** in the Settings tab, each site gets a 72-hour colour-coded forecast chart followed by its text summary — repeated for every site in drive-time order.
+
+![HTML email](screenshots/email_html.png)
+
+The colour scale for each row:
+
+| Row | Dark blue | → | Light / other |
+|-----|-----------|---|---------------|
+| Cloud Cover | 0% (clear) | | 100% (overcast) → white |
+| Seeing / Transparency | 8/8 (excellent) | | 1/8 (poor) → white |
+| Wind | Calm | Orange (moderate) | Red (strong 30+ km/h) |
+| Humidity | < 40% | | > 90% → white |
+| Temperature | Cold (≤ −15°C) | Gray (mild) | Warm (≥ 30°C) → orange |
+| Precip | 0 mm (dry) → light gray | | ≥ 1 mm → dark red |
+| Moon | New moon → dark gray | | Full moon → light gray |
+
+Moon rise (▲) and set (▼) events are marked on the Moon row.
+
+### Plain text email
+
 ```
 Moon: 79% illuminated  rises 20:22Z  sets 08:17Z
 
@@ -335,8 +359,6 @@ Durham Home (home)
   NO-GO — 29/100  [weather 21%, seeing 67%, moon 3%]
   Partly cloudy (32%) · Poor transparency (2.0/8) · Bright moon (79% illuminated) · Moon up at midnight
 ```
-
-Sites are listed in drive-time order (shortest first). The subject line calls out the best GO site, or the highest-scoring site if everything is NO-GO.
 
 ## Project structure
 
