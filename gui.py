@@ -499,6 +499,9 @@ class AstroAlertApp(tk.Tk):
                                           drive, dist, site.timezone, active))
             if needs_drive and home:
                 self._fetch_drive_times(home, needs_drive)
+            first = self._tree.get_children()
+            if first:
+                self._tree.selection_set(first[0])
 
         if hasattr(self, "_site_combo"):
             try:
