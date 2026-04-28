@@ -57,6 +57,17 @@ def _get_home_location():
         return None
 
 
+def _haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Straight-line distance in miles between two lat/lon points."""
+    import math
+    R = 3958.8
+    φ1, φ2 = math.radians(lat1), math.radians(lat2)
+    dφ = math.radians(lat2 - lat1)
+    dλ = math.radians(lon2 - lon1)
+    a = math.sin(dφ / 2) ** 2 + math.cos(φ1) * math.cos(φ2) * math.sin(dλ / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
 def _osrm_drive_minutes(home_lat: float, home_lon: float,
                          site_lat: float, site_lon: float) -> int:
     """Return driving minutes between two points via the public OSRM API."""
@@ -395,7 +406,7 @@ class AstroAlertApp(tk.Tk):
         left = ttk.Frame(self._sites_paned)
         self._sites_paned.add(left, weight=1)
 
-        cols = ("key", "name", "bortle", "drive", "timezone", "active")
+        cols = ("key", "name", "bortle", "drive", "dist", "timezone", "active")
         self._tree = ttk.Treeview(left, columns=cols, show="headings",
                                    selectmode="browse")
 
@@ -404,6 +415,7 @@ class AstroAlertApp(tk.Tk):
             ("name",     "Name",      160, "w"),
             ("bortle",   "Bortle",     60, "center"),
             ("drive",    "Drive",      70, "center"),
+            ("dist",     "Dist (mi)",  75, "center"),
             ("timezone", "Timezone",  150, "w"),
             ("active",   "Active",     50, "center"),
         ]:
@@ -470,12 +482,17 @@ class AstroAlertApp(tk.Tk):
             except FileNotFoundError:
                 self._sync_map_markers()
                 return
+            home = _get_home_location()
             for key, site, is_active in entries:
                 drive  = f"{site.drive_min} min" if site.drive_min else "—"
                 active = "★" if is_active else ""
+                if home and not is_active:
+                    dist = f"{_haversine_miles(home[0], home[1], site.lat, site.lon):.0f}"
+                else:
+                    dist = "—"
                 self._tree.insert("", "end", iid=key,
                                   values=(key, site.name, site.bortle,
-                                          drive, site.timezone, active))
+                                          drive, dist, site.timezone, active))
 
         if hasattr(self, "_site_combo"):
             try:
