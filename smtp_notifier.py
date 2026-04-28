@@ -79,6 +79,41 @@ def _format_report(report: SiteReport) -> list[str]:
     return lines
 
 
+def _render_targets_html(targets: list) -> str:
+    """Return an HTML table of target recommendations, or empty string if no targets."""
+    if not targets:
+        return ""
+    th = (
+        '<th style="text-align:left;padding:3px 10px 3px 0;'
+        'color:#8b949e;font-weight:normal;white-space:nowrap">'
+    )
+    td = '<td style="padding:2px 10px 2px 0;white-space:nowrap">'
+    td_desc = '<td style="padding:2px 0;color:#8b949e">'
+    rows = "".join(
+        f"<tr>"
+        f"{td}{html.escape(t.name)}</td>"
+        f"{td}{html.escape(t.common_name)}</td>"
+        f"{td}{html.escape(t.type)}</td>"
+        f"{td}{t.peak_alt_deg:.0f}°</td>"
+        f"{td}{t.hours_visible:.0f}h</td>"
+        f"{td}{t.transit_utc.strftime('%H:%M') if t.transit_utc else '—'} UTC</td>"
+        f"{td_desc}{html.escape(t.description)}</td>"
+        f"</tr>"
+        for t in targets
+    )
+    return (
+        '<h4 style="font-family:monospace;color:#58a6ff;margin:14px 0 6px">'
+        "Recommended Targets</h4>"
+        '<table style="border-collapse:collapse;font-family:monospace;'
+        'font-size:11px;color:#c9d1d9">'
+        f"<tr>{th}Name</th>{th}Common Name</th>{th}Type</th>"
+        f"{th}Peak Alt</th>{th}Hrs Vis</th>{th}Transits (UTC)</th>"
+        f'{th}Description</th></tr>'
+        + rows
+        + "</table>"
+    )
+
+
 def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight",
                            sites: Optional[list] = None) -> EmailResult:
     """Send a single email summarising all sites. Returns EmailResult — never raises."""
@@ -163,7 +198,30 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
                     f'<h3 style="font-family:monospace;color:#58a6ff;'
                     f'margin:24px 0 6px">{html.escape(report.site_name)}</h3>'
                 )
-                blocks.append(heading + chart_html_frag + legend_html + text_block)
+
+                targets_html = ""
+                if report.score.go and site_obj is not None:
+                    try:
+                        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+                        from moon import compute_imaging_window
+                        from target_recommender import get_nightly_targets
+                        today_utc = _dt.now(_tz.utc).date()
+                        target_date = (
+                            today_utc + _td(days=1)
+                            if "tomorrow" in night_label
+                            else today_utc
+                        )
+                        window = compute_imaging_window(site_obj.lat, site_obj.lon, target_date)
+                        site_targets = get_nightly_targets(site_obj.lat, site_obj.lon, window)
+                        targets_html = _render_targets_html(site_targets)
+                    except Exception as _tgt_exc:
+                        import logging as _logging
+                        _logging.getLogger(__name__).warning(
+                            "Target recommendations failed for %s: %s",
+                            report.site_name, _tgt_exc,
+                        )
+
+                blocks.append(heading + chart_html_frag + legend_html + text_block + targets_html)
 
             separator = '<hr style="border:none;border-top:1px solid #30363d;margin:16px 0">'
             html_body = (

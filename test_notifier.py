@@ -214,6 +214,63 @@ class TestSendMultiSiteAlert:
                 result = send_multi_site_alert([make_report()])
         assert result.sent
 
+    def test_html_email_includes_recommended_targets_for_go_site(self):
+        from target_recommender import TargetResult
+
+        go_report   = SiteReport("Bladen Lakes", drive_min=120,
+                                  score=make_score(go=True,  total=72), moon=make_moon())
+        nogo_report = SiteReport("Durham Home",  drive_min=None,
+                                  score=make_score(go=False, total=30), moon=make_moon())
+
+        fake_site = MagicMock()
+        fake_site.name     = "Bladen Lakes"
+        fake_site.lat      = 34.7
+        fake_site.lon      = -78.6
+        fake_site.timezone = "America/New_York"
+
+        fake_nogo_site = MagicMock()
+        fake_nogo_site.name     = "Durham Home"
+        fake_nogo_site.lat      = 36.0
+        fake_nogo_site.lon      = -78.9
+        fake_nogo_site.timezone = "America/New_York"
+
+        fake_target = TargetResult(
+            name="M13", common_name="Hercules Cluster", type="Globular Cluster",
+            magnitude=5.8, size_arcmin=20, description="Finest northern globular",
+            peak_alt_deg=74.5, hours_visible=7.0,
+            transit_utc=datetime(2026, 4, 28, 2, 0, tzinfo=timezone.utc),
+        )
+
+        captured = {}
+        mock_smtp = self._make_smtp()
+        mock_smtp.sendmail.side_effect = (
+            lambda from_addr, to_addrs, msg_str: captured.update({"msg_str": msg_str})
+        )
+
+        env = {**ENV, "EMAIL_FORMAT": "html"}
+        with patch.dict("os.environ", env):
+            with patch("smtp_notifier.smtplib.SMTP", return_value=mock_smtp):
+                with patch("target_recommender.get_nightly_targets", return_value=[fake_target]):
+                    with patch("chart_html.build_chart_data"):
+                        with patch("chart_html.render_chart_fragment", return_value="<table></table>"):
+                            send_multi_site_alert(
+                                [go_report, nogo_report],
+                                night_label="tonight",
+                                sites=[fake_site, fake_nogo_site],
+                            )
+
+        msg_str = captured.get("msg_str", "")
+        assert msg_str, "No HTML email was sent"
+        import email as _email
+        mime = _email.message_from_string(msg_str)
+        html_content = ""
+        for part in mime.walk():
+            if part.get_content_type() == "text/html":
+                html_content = part.get_payload(decode=True).decode()
+                break
+        assert "Recommended Targets" in html_content
+        assert "M13" in html_content
+
 
 # --- _clean ------------------------------------------------------------------
 
