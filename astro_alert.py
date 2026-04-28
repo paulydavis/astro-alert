@@ -105,7 +105,8 @@ def cmd_run(args) -> None:
         print("(dry-run: email not sent)")
         return
 
-    result = send_multi_site_alert(reports, night_label=night_label)
+    result = send_multi_site_alert(reports, night_label=night_label,
+                                    sites=sites_to_fetch)
     if result.sent:
         print("Alert sent via EMAIL")
     else:

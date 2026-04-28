@@ -1024,6 +1024,33 @@ class AstroAlertApp(tk.Tk):
                                      command=self._send_test_email)
         self._test_btn.pack(side="left")
 
+        # ── Email Format ───────────────────────────────────────────────────────────
+        ttk.Separator(inner).pack(fill="x", pady=(24, 0))
+        ttk.Label(inner, text="Email Format",
+                  font=(FONT_PROP, 15, "bold")).pack(pady=(16, 4))
+        ttk.Label(inner,
+                  text="Choose how alert emails are sent.",
+                  style="Sub.TLabel").pack(pady=(0, 16))
+
+        fmt_card = ttk.Frame(inner, style="Card.TFrame")
+        fmt_card.pack(fill="x", ipadx=28, ipady=16)
+
+        self._email_format_var = tk.StringVar(value="plain")
+        ttk.Radiobutton(fmt_card, text="Plain text  (current behavior)",
+                         variable=self._email_format_var,
+                         value="plain").pack(anchor="w", padx=16, pady=(8, 4))
+        ttk.Radiobutton(fmt_card, text="HTML with chart  (color-coded 72-hour grid)",
+                         variable=self._email_format_var,
+                         value="html").pack(anchor="w", padx=16, pady=(0, 8))
+
+        def _on_email_format_change(*_):
+            from data_dir import ENV_FILE
+            from dotenv import set_key
+            ENV_FILE.touch()
+            set_key(ENV_FILE, "EMAIL_FORMAT", self._email_format_var.get())
+
+        self._email_format_var.trace_add("write", _on_email_format_change)
+
         # ── Home Location ──────────────────────────────────────────────────────
         ttk.Separator(inner).pack(fill="x", pady=(24, 0))
         ttk.Label(inner, text="Home Location",
@@ -1098,6 +1125,8 @@ class AstroAlertApp(tk.Tk):
             self._smtp_host_var.set(smtp_host)
             self._smtp_port_var.set(vals.get("SMTP_PORT", "587"))
             self._smtp_detail_frame.pack(fill="x", ipadx=28, ipady=12)
+        if hasattr(self, "_email_format_var"):
+            self._email_format_var.set(vals.get("EMAIL_FORMAT", "plain"))
 
     def _save_credentials(self, silent=False):
         import unicodedata

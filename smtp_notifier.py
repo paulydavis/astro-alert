@@ -78,7 +78,8 @@ def _format_report(report: SiteReport) -> list[str]:
     return lines
 
 
-def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight") -> EmailResult:
+def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight",
+                           sites: Optional[list] = None) -> EmailResult:
     """Send a single email summarising all sites. Returns EmailResult — never raises."""
     from data_dir import ENV_FILE
     load_dotenv(ENV_FILE, override=True)
@@ -114,6 +115,45 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
     for report in reports:
         body_lines.extend(_format_report(report))
         body_lines.append("")
+
+    email_format = _clean(os.getenv("EMAIL_FORMAT", "plain"))
+
+    if email_format == "html" and sites:
+        go_sites_ordered = [s for s in sites if any(r.site_name == s.name and r.score.go for r in reports)]
+        chart_site = go_sites_ordered[0] if go_sites_ordered else sites[0]
+        try:
+            from chart_html import build_chart_data, render_html
+            chart_data = build_chart_data(chart_site, hours=72)
+            plain_body = "\n".join(body_lines).strip()
+            html_body  = render_html(chart_data)
+            html_body  = html_body.replace(
+                "</body></html>",
+                f'<pre style="font-family:monospace;color:#c9d1d9;margin-top:16px">'
+                f'{plain_body}</pre></body></html>'
+            )
+
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
+            mime_msg = MIMEMultipart("alternative")
+            mime_msg["Subject"] = subject
+            mime_msg["From"]    = smtp_user
+            mime_msg["To"]      = email_to
+            mime_msg.attach(MIMEText(plain_body, "plain"))
+            mime_msg.attach(MIMEText(html_body,  "html"))
+
+            try:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as smtp:
+                    smtp.ehlo()
+                    smtp.starttls()
+                    smtp.login(smtp_user, smtp_password)
+                    smtp.sendmail(smtp_user, [email_to], mime_msg.as_string())
+                return EmailResult(sent=True)
+            except smtplib.SMTPAuthenticationError:
+                return EmailResult(sent=False, error="Auth failed — check your App Password.")
+            except Exception as e:
+                return EmailResult(sent=False, error=str(e))
+        except Exception:
+            pass  # fall through to plain text
 
     msg = EmailMessage()
     msg["Subject"] = subject
