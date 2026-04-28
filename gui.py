@@ -616,7 +616,6 @@ class AstroAlertApp(tk.Tk):
             padx=6, pady=3, justify="left",
         )
         self._chart_canvas.bind("<Motion>", self._on_chart_motion)
-        self._chart_canvas.bind("<Leave>",  lambda _e: self._chart_tooltip_lbl.place_forget())
 
         # Mouse-wheel horizontal scroll
         def _on_chart_wheel(e):
@@ -789,7 +788,7 @@ class AstroAlertApp(tk.Tk):
             lambda v: f"{v}%",
         ]
 
-        if col < 0 or col >= 72 or row < 0 or row >= len(ROW_FIELDS):
+        if col < 0 or col >= len(data.cloud) or row < 0 or row >= len(ROW_FIELDS):
             self._chart_tooltip_lbl.place_forget()
             return
 
