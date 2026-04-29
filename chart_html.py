@@ -250,7 +250,7 @@ def render_chart_fragment(data: ChartData) -> str:
     lines.append(f'<td style="width:{_LABEL_W}px"></td>')
     for day in range(num_days):
         dt = data.start_dt + timedelta(hours=day * 24)
-        label = dt.strftime("%a %b %-d")
+        label = dt.strftime("%a %b ") + str(dt.day)
         lines.append(
             f'<td colspan="24" style="text-align:center;font-weight:bold;'
             f'padding:2px 0;color:#58a6ff">{label}</td>'

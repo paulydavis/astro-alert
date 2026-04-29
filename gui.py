@@ -24,6 +24,11 @@ try:
 except ImportError:
     _MAP_AVAILABLE = False
 
+
+def _fmt_date(dt) -> str:
+    """Cross-platform strftime for 'Mon Apr 7' — %-d fails on Windows."""
+    return dt.strftime("%a %b ") + str(dt.day)
+
 # ── Platform fonts ─────────────────────────────────────────────────────────────
 _OS        = platform.system()
 FONT_PROP  = {"Darwin": "Helvetica", "Windows": "Segoe UI"}.get(_OS, "DejaVu Sans")
@@ -1011,7 +1016,7 @@ class AstroAlertApp(tk.Tk):
             score       = night["score"]
             moon        = night["moon"]
 
-            date_str    = target_date.strftime("%a %b %-d")
+            date_str    = _fmt_date(target_date)
             verdict_str = "GO" if score.go else "no-go"
             score_str   = f"{score.total}/100"
             cloud_str   = f"{score.avg_cloud_pct}%" if score.avg_cloud_pct >= 0 else "—"
@@ -1344,7 +1349,7 @@ class AstroAlertApp(tk.Tk):
         # ── Date headers ──────────────────────────────────────────────────────
         for day in range(3):
             dt = data.start_dt + timedelta(hours=day * 24)
-            label = dt.strftime("%a %b %-d")
+            label = _fmt_date(dt)
             x = LABEL_W + day * 24 * CELL_W + 12 * CELL_W
             canvas.create_text(x, 13, text=label, fill=ACCENT,
                                font=(FONT_PROP, 10, "bold"), anchor="center")
