@@ -1789,8 +1789,45 @@ class AstroAlertApp(tk.Tk):
         ttk.Label(inner, textvariable=self._eq_status_var,
                   style="Dim.TLabel").pack(pady=(4, 24))
 
+        # ── OpenAI API Key ─────────────────────────────────────────────────────────
+        ttk.Separator(inner).pack(fill="x", pady=(24, 0))
+        ttk.Label(inner, text="AI Game Plan  (Optional)",
+                  font=(FONT_PROP, 15, "bold")).pack(pady=(16, 4))
+        ttk.Label(inner,
+                  text="Adds a personalised session game plan to each report card. Free to skip — a built-in template is used instead.",
+                  style="Sub.TLabel").pack(pady=(0, 16))
+
+        ai_card = ttk.Frame(inner, style="Card.TFrame")
+        ai_card.pack(fill="x", ipadx=28, ipady=16)
+        ai_card.columnconfigure(1, weight=1)
+
+        self._openai_key_var  = tk.StringVar()
+        self._openai_key_shown = False
+
+        ttk.Label(ai_card, text="OpenAI API key:", style="CardDim.TLabel").grid(
+            row=0, column=0, sticky="w", pady=8, padx=(16, 12))
+        self._openai_key_entry = ttk.Entry(ai_card, textvariable=self._openai_key_var,
+                                           font=(FONT_PROP, 12), width=46, show="•")
+        self._openai_key_entry.grid(row=0, column=1, sticky="ew", pady=8)
+        ttk.Button(ai_card, text="Show", width=6,
+                   command=self._toggle_openai_key).grid(row=0, column=2, padx=(8, 16), pady=8)
+
+        ttk.Label(ai_card,
+                  text="Get a key at platform.openai.com → API keys → Create new secret key.",
+                  style="CardDim.TLabel").grid(
+            row=1, column=0, columnspan=3, pady=(0, 4), padx=16, sticky="w")
+
+        self._openai_status_var = tk.StringVar()
+        ai_btn_row = ttk.Frame(inner)
+        ai_btn_row.pack(pady=(14, 4))
+        ttk.Button(ai_btn_row, text="Save API Key", style="Accent.TButton",
+                   command=self._save_openai_key).pack()
+        ttk.Label(inner, textvariable=self._openai_status_var,
+                  style="Dim.TLabel").pack(pady=(4, 24))
+
         self.after(50, self._load_credentials_to_form)
         self.after(80, self._load_equipment_to_form)
+        self.after(90, self._load_openai_key_to_form)
         self.after(100, lambda: canvas.configure(scrollregion=canvas.bbox("all")))
 
     def _load_credentials_to_form(self):
@@ -1972,6 +2009,29 @@ class AstroAlertApp(tk.Tk):
     def _toggle_password(self):
         self._pass_shown = not self._pass_shown
         self._pass_entry.configure(show="" if self._pass_shown else "•")
+
+    def _load_openai_key_to_form(self):
+        from data_dir import ENV_FILE
+        from dotenv import dotenv_values
+        vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
+        self._openai_key_var.set(vals.get("OPENAI_API_KEY", ""))
+
+    def _save_openai_key(self):
+        import unicodedata
+        from data_dir import ENV_FILE
+        from dotenv import set_key, unset_key
+        key = unicodedata.normalize("NFKC", self._openai_key_var.get()).strip()
+        ENV_FILE.touch()
+        if key:
+            set_key(ENV_FILE, "OPENAI_API_KEY", key)
+            self._openai_status_var.set("API key saved.")
+        else:
+            unset_key(ENV_FILE, "OPENAI_API_KEY")
+            self._openai_status_var.set("API key removed.")
+
+    def _toggle_openai_key(self):
+        self._openai_key_shown = not self._openai_key_shown
+        self._openai_key_entry.configure(show="" if self._openai_key_shown else "•")
 
     def _on_smtp_toggle(self):
         if self._smtp_custom_var.get():

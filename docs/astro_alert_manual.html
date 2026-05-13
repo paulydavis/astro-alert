@@ -610,8 +610,16 @@ hr { border:none; border-top:1px solid #152535; margin:40px 0 }
 <h3>Does it work outside North America?</h3>
 <p>Yes. Open-Meteo and 7timer.info are global. SDSS coverage is limited to the northern sky; for southern hemisphere objects the Legacy Survey and DSS fallbacks are used automatically.</p>
 
-<h3>What if the OpenAI key is missing?</h3>
-<p>The card and email still generate fully — a rule-based fallback writes the Game Plan and summary text. The OpenAI key only adds richer narrative language.</p>
+<h3>What is the OpenAI API key and do I need one?</h3>
+<p>The OpenAI API key is completely optional. Without it, every feature works — the GO/NO-GO score, target list, images, timing windows, and email all generate normally. The only difference is that the <strong>Game Plan</strong> section on the card is written by a built-in template rather than by AI.</p>
+<p>If you want the AI-written game plan, here is how to set it up:</p>
+<ol style="margin:8px 0 12px 0; padding-left:24px; line-height:1.8">
+  <li>Go to <a href="https://platform.openai.com">platform.openai.com</a> and sign in or create a free account.</li>
+  <li>In the left sidebar click <strong>API keys</strong>, then <strong>Create new secret key</strong>.</li>
+  <li>Copy the key — it is only shown once.</li>
+  <li>In AstroAlert go to <strong>Settings → AI Game Plan</strong>, paste the key into the field, and click <em>Save API Key</em>.</li>
+</ol>
+<p>OpenAI charges per use. Generating one report card uses roughly 500–800 tokens — at current pricing (around $2.50 per million tokens) that works out to less than a cent per card. A full year of nightly alerts costs about $1–2 total.</p>
 
 <h3>Can I use it with a narrowband filter?</h3>
 <p>Yes — the target recommendations still apply. Emission nebulae rank highest and those are exactly the objects that benefit most from a dual-narrowband or Hα filter. The GO/NO-GO score is calculated for broadband imaging, so on nights the score is marginal you may still get good narrowband results since that filter cuts moonlight and light pollution.</p>
