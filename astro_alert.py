@@ -81,7 +81,7 @@ def _generate_cards(site_report_pairs: list, target_date, openai_key: str) -> di
                 drive_min=site.drive_min,
                 equipment=equipment_string(),
             )
-            png_path = generate_site_card(card, openai_key, output_dir)
+            png_path, _ = generate_site_card(card, openai_key, output_dir)
             if png_path:
                 cards[site.name] = png_path
                 print("done")

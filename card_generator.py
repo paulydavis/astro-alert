@@ -85,11 +85,13 @@ Include bullets for each of the {min(len(card.targets), 6)} targets listed. Be c
             max_tokens=1000,
             temperature=0.7,
         )
-        return json.loads(resp.choices[0].message.content)
+        result = json.loads(resp.choices[0].message.content)
+        result["_source"] = "openai"
+        return result
 
     except Exception as exc:
         _log.warning("OpenAI narrative failed (%s), using fallback", exc)
-        return _fallback_narrative(card)
+        return {**_fallback_narrative(card), "_source": "fallback"}
 
 
 def _fallback_narrative(card: CardInput) -> dict:
@@ -490,8 +492,8 @@ def generate_site_card(
     card: CardInput,
     openai_key: str,
     output_dir: Path,
-) -> Optional[Path]:
-    """Generate a report card PNG for one site. Returns output Path or None on failure."""
+) -> tuple[Optional[Path], bool]:
+    """Generate a report card PNG for one site. Returns (path, ai_used) or (None, False)."""
     try:
         from dso_images import fetch_dso_image
 
@@ -501,13 +503,19 @@ def generate_site_card(
             if img_bytes:
                 dso_uris[t.name] = _b64_uri(img_bytes)
 
-        narrative = generate_narrative(card, openai_key) if openai_key else _fallback_narrative(card)
+        if openai_key:
+            narrative = generate_narrative(card, openai_key)
+        else:
+            narrative = {**_fallback_narrative(card), "_source": "fallback"}
+
+        ai_used = narrative.get("_source") == "openai"
+        _log.info("Narrative source for %s: %s", card.site_name, narrative.get("_source", "openai"))
         html = build_card_html(card, narrative, dso_uris)
 
         safe_key = card.site_key.replace("/", "_").replace(" ", "_")
         out_path = Path(output_dir) / f"{safe_key}_{card.target_date.isoformat()}.png"
-        return render_card_png(html, out_path)
+        return render_card_png(html, out_path), ai_used
 
     except Exception as exc:
         _log.error("Card generation failed for %s: %s", card.site_name, exc)
-        return None
+        return None, False

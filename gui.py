@@ -1754,6 +1754,37 @@ class AstroAlertApp(tk.Tk):
         ttk.Label(inner, text="Shown on report cards and used to personalise AI game plans.",
                   style="Sub.TLabel").pack(pady=(0, 16))
 
+        _EQ_PRESETS = {
+            "— Select a preset —": None,
+            "Seestar S30":      {"camera":"Built-in Sony IMX462","telescope":"ZWO Seestar S30","reducer":"","mount":"Built-in alt-az","focal_length_mm":"150","focal_ratio":"f/5","fov_deg":"2.35 x 1.32"},
+            "Seestar S30 Pro":  {"camera":"Built-in Sony IMX462","telescope":"ZWO Seestar S30 Pro","reducer":"","mount":"Built-in alt-az","focal_length_mm":"150","focal_ratio":"f/5","fov_deg":"2.35 x 1.32"},
+            "Seestar 50":       {"camera":"Built-in Sony IMX462","telescope":"ZWO Seestar 50","reducer":"","mount":"Built-in alt-az","focal_length_mm":"250","focal_ratio":"f/5","fov_deg":"1.41 x 0.79"},
+            "Dwarf III":        {"camera":"Built-in Sony IMX678","telescope":"Dwarf III","reducer":"","mount":"Built-in alt-az","focal_length_mm":"100","focal_ratio":"f/4","fov_deg":"3.0 x 2.0"},
+            "Unistellar Odyssey":{"camera":"Built-in Sony IMX347","telescope":"Unistellar Odyssey","reducer":"","mount":"Built-in alt-az","focal_length_mm":"150","focal_ratio":"f/4","fov_deg":"2.5 x 1.7"},
+        }
+
+        preset_row = ttk.Frame(inner)
+        preset_row.pack(fill="x", pady=(0, 8))
+        ttk.Label(preset_row, text="Quick preset:", style="CardDim.TLabel").pack(side="left", padx=(4, 8))
+        self._eq_preset_var = tk.StringVar(value="— Select a preset —")
+        preset_cb = ttk.Combobox(preset_row, textvariable=self._eq_preset_var,
+                                  values=list(_EQ_PRESETS.keys()), state="readonly",
+                                  font=(FONT_PROP, 12), width=28)
+        preset_cb.pack(side="left")
+
+        def _on_preset(e):
+            p = _EQ_PRESETS.get(self._eq_preset_var.get())
+            if not p:
+                return
+            self._eq_camera_var.set(p["camera"])
+            self._eq_telescope_var.set(p["telescope"])
+            self._eq_reducer_var.set(p["reducer"])
+            self._eq_mount_var.set(p["mount"])
+            self._eq_focal_var.set(str(p["focal_length_mm"]))
+            self._eq_ratio_var.set(p["focal_ratio"])
+            self._eq_fov_var.set(p["fov_deg"])
+        preset_cb.bind("<<ComboboxSelected>>", _on_preset)
+
         eq_card = ttk.Frame(inner, style="Card.TFrame")
         eq_card.pack(fill="x", ipadx=28, ipady=16)
         eq_card.columnconfigure(1, weight=1)
@@ -2230,6 +2261,7 @@ class AstroAlertApp(tk.Tk):
             weights = load_weights()
             generated: list[tuple[str, _Path]] = []
             first_error: str = ""
+            used_ai: bool = False
 
             for i, site in enumerate(sites):
                 self.after(0, self._card_status_var.set,
@@ -2257,9 +2289,11 @@ class AstroAlertApp(tk.Tk):
                         drive_min=site.drive_min,
                         equipment=equipment_string(),
                     )
-                    png_path = generate_site_card(card, openai_key, output_dir)
+                    png_path, ai_used = generate_site_card(card, openai_key, output_dir)
                     if png_path is not None:
                         generated.append((site.name, png_path))
+                        if ai_used:
+                            used_ai = True
                 except Exception as site_exc:
                     import logging as _log
                     _log.getLogger(__name__).warning(
@@ -2270,13 +2304,13 @@ class AstroAlertApp(tk.Tk):
                         first_error = f"{site.name}: {site_exc}"
 
             if not generated and first_error:
-                self.after(0, self._card_gen_done, [], first_error)
+                self.after(0, self._card_gen_done, [], first_error, False)
                 return
-            self.after(0, self._card_gen_done, generated, "")
+            self.after(0, self._card_gen_done, generated, "", used_ai)
         except Exception as exc:
-            self.after(0, self._card_gen_done, [], str(exc))
+            self.after(0, self._card_gen_done, [], str(exc), False)
 
-    def _card_gen_done(self, generated: list, error: str):
+    def _card_gen_done(self, generated: list, error: str, used_ai: bool = False):
         self._card_gen_btn.configure(state="normal", text="Generate Cards")
         if error:
             self._card_status_var.set(f"Error: {error}")
@@ -2286,7 +2320,8 @@ class AstroAlertApp(tk.Tk):
             return
         self._card_paths = generated
         self._card_idx = 0
-        self._card_status_var.set(f"Generated {len(generated)} card(s).")
+        ai_note = "  ·  AI game plan ✓" if used_ai else "  ·  template game plan (no API key)"
+        self._card_status_var.set(f"Generated {len(generated)} card(s).{ai_note}")
         self._show_card(0)
 
     # ── Status bar ──────────────────────────────────────────────────────────────
