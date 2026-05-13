@@ -115,7 +115,8 @@ def _render_targets_html(targets: list) -> str:
 
 
 def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight",
-                           sites: Optional[list] = None) -> EmailResult:
+                           sites: Optional[list] = None,
+                           card_pngs: Optional[dict] = None) -> EmailResult:
     """Send a single email summarising all sites. Returns EmailResult — never raises."""
     from data_dir import ENV_FILE
     load_dotenv(ENV_FILE, override=True)
@@ -233,12 +234,37 @@ def send_multi_site_alert(reports: list[SiteReport], night_label: str = "tonight
             )
 
             plain_body = "\n".join(body_lines).strip()
-            mime_msg = MIMEMultipart("alternative")
-            mime_msg["Subject"] = subject
-            mime_msg["From"]    = smtp_user
-            mime_msg["To"]      = email_to
-            mime_msg.attach(MIMEText(plain_body, "plain"))
-            mime_msg.attach(MIMEText(html_body,  "html"))
+
+            if card_pngs:
+                from email.mime.image import MIMEImage
+                outer = MIMEMultipart("mixed")
+                outer["Subject"] = subject
+                outer["From"]    = smtp_user
+                outer["To"]      = email_to
+                alt = MIMEMultipart("alternative")
+                alt.attach(MIMEText(plain_body, "plain"))
+                alt.attach(MIMEText(html_body,  "html"))
+                outer.attach(alt)
+                for site_name, png_path in card_pngs.items():
+                    try:
+                        img_data = png_path.read_bytes()
+                        img = MIMEImage(img_data, _subtype="png")
+                        safe = site_name.replace(" ", "_")
+                        img.add_header("Content-Disposition", "attachment",
+                                       filename=f"report_card_{safe}.png")
+                        outer.attach(img)
+                    except Exception as _img_exc:
+                        _logging.getLogger(__name__).warning(
+                            "Could not attach card PNG for %s: %s", site_name, _img_exc
+                        )
+                mime_msg = outer
+            else:
+                mime_msg = MIMEMultipart("alternative")
+                mime_msg["Subject"] = subject
+                mime_msg["From"]    = smtp_user
+                mime_msg["To"]      = email_to
+                mime_msg.attach(MIMEText(plain_body, "plain"))
+                mime_msg.attach(MIMEText(html_body,  "html"))
 
             try:
                 with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as smtp:

@@ -140,6 +140,7 @@ class AstroAlertApp(tk.Tk):
         self.after(100, self._refresh_sites)
         self.after(200, self._refresh_cred_banner)
         self.after(400, self._check_first_run)
+        self.after(800, self._start_card_generation)
 
     # ── Styles ─────────────────────────────────────────────────────────────────
 
@@ -246,6 +247,7 @@ class AstroAlertApp(tk.Tk):
         self._tab_chart    = ttk.Frame(nb)
         self._tab_scoring  = ttk.Frame(nb)
         self._tab_settings = ttk.Frame(nb)
+        self._tab_card     = ttk.Frame(nb)
 
         nb.add(self._tab_dash,     text="  Dashboard  ")
         nb.add(self._tab_sites,    text="  Sites  ")
@@ -254,6 +256,7 @@ class AstroAlertApp(tk.Tk):
         nb.add(self._tab_chart,    text="  Chart  ")
         nb.add(self._tab_scoring,  text="  Scoring  ")
         nb.add(self._tab_settings, text="  Settings  ")
+        nb.add(self._tab_card,     text="  Report Card  ")
 
         self._build_dashboard(self._tab_dash)
         self._build_sites_tab(self._tab_sites)
@@ -262,6 +265,7 @@ class AstroAlertApp(tk.Tk):
         self._build_chart_tab(self._tab_chart)
         self._build_scoring_tab(self._tab_scoring)
         self._build_settings_tab(self._tab_settings)
+        self._build_report_card_tab(self._tab_card)
 
     # ── Dashboard ───────────────────────────────────────────────────────────────
 
@@ -475,6 +479,7 @@ class AstroAlertApp(tk.Tk):
                 add_site(**dlg.result)
                 self._refresh_sites()
                 self._set_status(f"Site '{dlg.result['key']}' added.")
+                self.after(200, self._start_card_generation)
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
 
@@ -600,6 +605,7 @@ class AstroAlertApp(tk.Tk):
                 add_site(**dlg.result)
                 self._refresh_sites()
                 self._set_status(f"Site '{dlg.result['key']}' added.")
+                self.after(200, self._start_card_generation)
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
 
@@ -617,6 +623,7 @@ class AstroAlertApp(tk.Tk):
                 add_site(**dlg.result)
                 self._refresh_sites()
                 self._set_status(f"Site '{key}' updated.")
+                self.after(200, self._start_card_generation)
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
 
@@ -630,6 +637,7 @@ class AstroAlertApp(tk.Tk):
             set_active_site(key)
             self._refresh_sites()
             self._set_status(f"Active site → '{key}'.")
+            self.after(200, self._start_card_generation)
         except Exception as e:
             messagebox.showerror("Error", str(e), parent=self)
 
@@ -646,6 +654,7 @@ class AstroAlertApp(tk.Tk):
                 delete_site(key)
                 self._refresh_sites()
                 self._set_status(f"Site '{key}' deleted.")
+                self.after(200, self._start_card_generation)
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
 
@@ -1938,6 +1947,206 @@ class AstroAlertApp(tk.Tk):
             self._nb.select(self._tab_settings)
         if not vals.get("HOME_LAT") or not vals.get("HOME_LON"):
             threading.Thread(target=self._do_ip_detect, daemon=True).start()
+
+    # ── Report Card tab ─────────────────────────────────────────────────────────
+
+    def _build_report_card_tab(self, parent):
+        self._card_paths: list[tuple[str, Path]] = []  # [(site_name, png_path), ...]
+        self._card_idx = 0
+
+        # ── Toolbar ────────────────────────────────────────────────────────────
+        toolbar = ttk.Frame(parent)
+        toolbar.pack(fill="x", padx=20, pady=(16, 8))
+
+        self._card_gen_btn = ttk.Button(
+            toolbar, text="Generate Cards", style="Accent.TButton",
+            command=self._start_card_generation,
+        )
+        self._card_gen_btn.pack(side="left")
+
+        self._card_status_var = tk.StringVar(value="")
+        ttk.Label(toolbar, textvariable=self._card_status_var,
+                  style="Dim.TLabel").pack(side="left", padx=(14, 0))
+
+        # Navigation on the right
+        self._card_nav_label = tk.StringVar(value="No cards generated")
+        ttk.Label(toolbar, textvariable=self._card_nav_label).pack(side="right", padx=(0, 8))
+        ttk.Button(toolbar, text="Next ›", command=self._card_next).pack(side="right", padx=(4, 0))
+        ttk.Button(toolbar, text="‹ Prev", command=self._card_prev).pack(side="right")
+
+        # ── Scrollable canvas ──────────────────────────────────────────────────
+        frame = ttk.Frame(parent)
+        frame.pack(fill="both", expand=True, padx=20, pady=(0, 16))
+
+        self._card_canvas = tk.Canvas(frame, bg=BG, highlightthickness=0)
+        vsb = ttk.Scrollbar(frame, orient="vertical",   command=self._card_canvas.yview)
+        hsb = ttk.Scrollbar(frame, orient="horizontal", command=self._card_canvas.xview)
+        self._card_canvas.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+
+        hsb.pack(side="bottom", fill="x")
+        vsb.pack(side="right",  fill="y")
+        self._card_canvas.pack(side="left", fill="both", expand=True)
+
+        self._card_canvas.bind("<Configure>", self._card_canvas_resize)
+        self._card_canvas.bind("<MouseWheel>",
+            lambda e: self._card_canvas.yview_scroll(
+                -1 * (e.delta // 120 if sys.platform != "darwin" else e.delta), "units"))
+
+        self._card_image_ref = None  # keep Pillow reference alive
+
+    def _card_canvas_resize(self, _event=None):
+        """Re-center image on canvas resize."""
+        if self._card_image_ref is not None:
+            self._card_canvas.delete("all")
+            self._card_canvas.create_image(0, 0, anchor="nw", image=self._card_image_ref)
+
+    def _card_prev(self):
+        if not self._card_paths:
+            return
+        self._card_idx = (self._card_idx - 1) % len(self._card_paths)
+        self._show_card(self._card_idx)
+
+    def _card_next(self):
+        if not self._card_paths:
+            return
+        self._card_idx = (self._card_idx + 1) % len(self._card_paths)
+        self._show_card(self._card_idx)
+
+    def _show_card(self, idx: int):
+        if not self._card_paths:
+            self._card_nav_label.set("No cards generated")
+            self._card_canvas.delete("all")
+            self._card_image_ref = None
+            return
+
+        site_name, png_path = self._card_paths[idx]
+        self._card_nav_label.set(
+            f"Site {idx + 1} of {len(self._card_paths)}: {site_name}"
+        )
+        try:
+            from PIL import Image, ImageTk
+            img = Image.open(png_path)
+            # Scale to fit canvas width — no horizontal scrolling needed
+            self._card_canvas.update_idletasks()
+            canvas_w = self._card_canvas.winfo_width()
+            if canvas_w > 50 and img.width > canvas_w:
+                scale = canvas_w / img.width
+                img = img.resize(
+                    (canvas_w, int(img.height * scale)),
+                    Image.LANCZOS,
+                )
+            photo = ImageTk.PhotoImage(img)
+            self._card_image_ref = photo
+            self._card_canvas.delete("all")
+            self._card_canvas.create_image(0, 0, anchor="nw", image=photo)
+            self._card_canvas.configure(scrollregion=(0, 0, img.width, img.height))
+        except ImportError:
+            self._card_canvas.delete("all")
+            self._card_canvas.create_text(
+                400, 200, text="Pillow not installed.\nRun: pip install Pillow",
+                fill=WARN_CLR, font=(FONT_MONO, 13), justify="center",
+            )
+        except Exception as exc:
+            self._card_canvas.delete("all")
+            self._card_canvas.create_text(
+                400, 200, text=f"Could not display card:\n{exc}",
+                fill=NOGO_CLR, font=(FONT_MONO, 12), justify="center",
+            )
+
+    def _start_card_generation(self):
+        self._card_gen_btn.configure(state="disabled", text="Generating…")
+        self._card_status_var.set("Fetching conditions…")
+        self._card_paths = []
+        threading.Thread(target=self._run_card_generation, daemon=True).start()
+
+    def _run_card_generation(self):
+        try:
+            from datetime import datetime as _dt, timedelta as _td, timezone as _tz, date as _date
+            from pathlib import Path as _Path
+            import os as _os
+
+            from data_dir import DATA_DIR, ENV_FILE
+            from dotenv import dotenv_values
+            from astro_alert import _fetch_report
+            from moon import compute_imaging_window
+            from scorer import score_night
+            from seeing import fetch_seeing
+            from site_manager import list_sites
+            from target_recommender import get_nightly_targets
+            from weather import fetch_weather
+            from card_generator import CardInput, generate_site_card
+            from scoring_weights import load_weights
+
+            env_vals = dotenv_values(ENV_FILE) if ENV_FILE.exists() else {}
+            openai_key = env_vals.get("OPENAI_API_KEY", "")
+
+            now_utc = _dt.now(_tz.utc)
+            today = now_utc.date() if now_utc.hour >= 12 else (now_utc - _td(days=1)).date()
+            target_date = today
+
+            entries = list_sites()
+            sites = sorted(
+                [s for _, s, _ in entries],
+                key=lambda s: (s.drive_min is None, s.drive_min or 0),
+            )
+
+            if not sites:
+                self.after(0, self._card_gen_done, [], "No sites configured.")
+                return
+
+            output_dir = DATA_DIR / "report_cards"
+            weights = load_weights()
+            generated: list[tuple[str, _Path]] = []
+
+            for i, site in enumerate(sites):
+                self.after(0, self._card_status_var.set,
+                           f"Processing {site.name} ({i + 1}/{len(sites)})…")
+                try:
+                    weather = fetch_weather(site.key, site.lat, site.lon, target_date=target_date)
+                    seeing  = fetch_seeing(site.key, site.lat, site.lon)
+                    from moon import get_moon_info
+                    moon = get_moon_info(site.lat, site.lon, target_date=target_date)
+                    score = score_night(weather, seeing, moon, bortle=site.bortle,
+                                        target_date=target_date, weights=weights)
+                    window = compute_imaging_window(site.lat, site.lon, target_date)
+                    targets = get_nightly_targets(site.lat, site.lon, window,
+                                                   max_results=12) if window else []
+                    card = CardInput(
+                        site_name=site.name,
+                        site_key=site.key,
+                        site_bortle=site.bortle,
+                        site_tz=getattr(site, "timezone", "UTC"),
+                        target_date=target_date,
+                        score=score,
+                        moon=moon,
+                        targets=targets,
+                        drive_min=site.drive_min,
+                    )
+                    png_path = generate_site_card(card, openai_key, output_dir)
+                    if png_path is not None:
+                        generated.append((site.name, png_path))
+                except Exception as site_exc:
+                    import logging as _log
+                    _log.getLogger(__name__).warning(
+                        "Card generation failed for %s: %s", site.name, site_exc
+                    )
+
+            self.after(0, self._card_gen_done, generated, "")
+        except Exception as exc:
+            self.after(0, self._card_gen_done, [], str(exc))
+
+    def _card_gen_done(self, generated: list, error: str):
+        self._card_gen_btn.configure(state="normal", text="Generate Cards")
+        if error:
+            self._card_status_var.set(f"Error: {error}")
+            return
+        if not generated:
+            self._card_status_var.set("No cards generated (check site config).")
+            return
+        self._card_paths = generated
+        self._card_idx = 0
+        self._card_status_var.set(f"Generated {len(generated)} card(s).")
+        self._show_card(0)
 
     # ── Status bar ──────────────────────────────────────────────────────────────
 

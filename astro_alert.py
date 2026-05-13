@@ -50,6 +50,47 @@ def _fetch_report(site, target_date) -> SiteReport:
     return SiteReport(site_name=site.name, drive_min=site.drive_min, score=score, moon=moon)
 
 
+def _generate_cards(site_report_pairs: list, target_date, openai_key: str) -> dict:
+    """Generate report card PNGs for GO sites. Returns {site_name: Path}."""
+    from data_dir import DATA_DIR
+    from moon import compute_imaging_window
+    from target_recommender import get_nightly_targets
+    from card_generator import CardInput, generate_site_card
+
+    output_dir = DATA_DIR / "report_cards"
+    cards = {}
+    go_pairs = [(s, r) for s, r in site_report_pairs if r.score.go]
+    if not go_pairs:
+        return cards
+
+    print(f"Generating report cards for {len(go_pairs)} GO site(s)…")
+    for site, report in go_pairs:
+        print(f"  {site.name}…", end=" ", flush=True)
+        try:
+            window = compute_imaging_window(site.lat, site.lon, target_date)
+            targets = get_nightly_targets(site.lat, site.lon, window, max_results=12) if window else []
+            card = CardInput(
+                site_name=site.name,
+                site_key=site.key,
+                site_bortle=site.bortle,
+                site_tz=getattr(site, "timezone", "UTC"),
+                target_date=target_date,
+                score=report.score,
+                moon=report.moon,
+                targets=targets,
+                drive_min=site.drive_min,
+            )
+            png_path = generate_site_card(card, openai_key, output_dir)
+            if png_path:
+                cards[site.name] = png_path
+                print("done")
+            else:
+                print("failed (card render error)")
+        except Exception as exc:
+            print(f"failed ({exc})")
+    return cards
+
+
 def cmd_run(args) -> None:
     now_utc = datetime.now(timezone.utc)
     # Noon UTC ≈ 8 AM Eastern — anything before that is still "last night" locally.
@@ -105,10 +146,23 @@ def cmd_run(args) -> None:
         print("(dry-run: email not sent)")
         return
 
+    # Generate report cards for GO sites when sending HTML email
+    import os
+    from dotenv import load_dotenv
+    from data_dir import ENV_FILE
+    load_dotenv(ENV_FILE, override=True)
+    card_pngs = {}
+    if os.getenv("EMAIL_FORMAT", "plain") == "html" and any_go:
+        openai_key = os.getenv("OPENAI_API_KEY", "")
+        site_report_pairs = list(zip(sites_to_fetch, reports))
+        card_pngs = _generate_cards(site_report_pairs, target_date, openai_key)
+
     result = send_multi_site_alert(reports, night_label=night_label,
-                                    sites=sites_to_fetch)
+                                    sites=sites_to_fetch,
+                                    card_pngs=card_pngs or None)
     if result.sent:
-        print("Alert sent via EMAIL")
+        cards_note = f" with {len(card_pngs)} card(s)" if card_pngs else ""
+        print(f"Alert sent via EMAIL{cards_note}")
     else:
         print(f"Alert failed: {result.error}", file=sys.stderr)
         sys.exit(1)

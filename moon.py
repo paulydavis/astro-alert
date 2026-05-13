@@ -110,15 +110,50 @@ def get_moon_info(lat: float, lon: float, target_date: Optional[date] = None) ->
     )
 
 
-def compute_imaging_window(lat: float, lon: float, target_date: date) -> set:
-    """Return the set of UTC hour datetimes covering sunset→sunrise for target_date.
+def get_astro_twilight_times(lat: float, lon: float, target_date: date) -> tuple[Optional[datetime], Optional[datetime]]:
+    """Return (astro_dusk_utc, astro_dawn_utc) — when sun reaches -18° on target_date night."""
+    obs = ephem.Observer()
+    obs.lat = str(lat)
+    obs.lon = str(lon)
+    obs.pressure = 0
+    obs.horizon = "-18"
 
-    Falls back to 20:00–04:00 UTC if sun times are unavailable (polar extremes).
+    def _to_utc(ephem_date) -> Optional[datetime]:
+        if ephem_date is None:
+            return None
+        return datetime.strptime(str(ephem_date), "%Y/%m/%d %H:%M:%S").replace(tzinfo=timezone.utc)
+
+    noon = datetime(target_date.year, target_date.month, target_date.day, 12, 0, 0)
+    obs.date = ephem.Date(noon)
+    sun = ephem.Sun()
+
+    try:
+        dusk_utc = _to_utc(obs.next_setting(sun, use_center=True))
+    except (ephem.NeverUpError, ephem.AlwaysUpError):
+        return None, None
+
+    if dusk_utc is None:
+        return None, None
+
+    obs.date = ephem.Date(dusk_utc.replace(tzinfo=None))
+    try:
+        dawn_utc = _to_utc(obs.next_rising(sun, use_center=True))
+    except (ephem.NeverUpError, ephem.AlwaysUpError):
+        dawn_utc = None
+
+    return dusk_utc, dawn_utc
+
+
+def compute_imaging_window(lat: float, lon: float, target_date: date) -> set:
+    """Return the set of UTC hour datetimes covering astronomical dark time for target_date.
+
+    Uses astronomical twilight (sun at -18°) so only genuinely dark hours are included.
+    Falls back to 22:00–04:00 UTC if twilight times are unavailable.
     """
-    sunset, sunrise = get_sun_times(lat, lon, target_date)
-    if sunset and sunrise:
-        start = sunset.replace(minute=0, second=0, microsecond=0)
-        end   = sunrise.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    dusk, dawn = get_astro_twilight_times(lat, lon, target_date)
+    if dusk and dawn:
+        start = dusk.replace(minute=0, second=0, microsecond=0)
+        end   = dawn.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         hours: set = set()
         t = start
         while t <= end:
@@ -128,11 +163,11 @@ def compute_imaging_window(lat: float, lon: float, target_date: date) -> set:
     ev = {
         datetime(target_date.year, target_date.month, target_date.day,
                  h, tzinfo=timezone.utc)
-        for h in range(20, 24)
+        for h in range(22, 24)
     }
     nd = target_date + timedelta(days=1)
     ea = {
         datetime(nd.year, nd.month, nd.day, h, tzinfo=timezone.utc)
-        for h in range(0, 5)
+        for h in range(0, 4)
     }
     return ev | ea
