@@ -441,15 +441,37 @@ def build_card_html(card: CardInput, narrative: dict, dso_image_uris: dict[str, 
 
 # ── PNG rendering ─────────────────────────────────────────────────────────────
 
+def _chromium_executable() -> Optional[str]:
+    """Return path to bundled Chromium when running as a PyInstaller app, else None."""
+    import sys, os
+    if not getattr(sys, "frozen", False):
+        return None
+    base = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    for candidate in [
+        base / "chromium" / "chrome",
+        base / "chromium" / "chrome.exe",
+        base / "chromium" / "Chromium.app" / "Contents" / "MacOS" / "Chromium",
+    ]:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
 def render_card_png(html: str, output_path: Path) -> Path:
     """Render the HTML card to a PNG using playwright (sync API)."""
+    import os
     from playwright.sync_api import sync_playwright
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # When bundled, point Playwright at the embedded browser.
+    chromium_exe = _chromium_executable()
+    if chromium_exe:
+        os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(Path(chromium_exe).parent.parent.parent))
+
     with sync_playwright() as pw:
-        browser = pw.chromium.launch()
+        browser = pw.chromium.launch(executable_path=chromium_exe)
         page = browser.new_page(
             viewport={"width": _CARD_WIDTH, "height": 900},
             device_scale_factor=2,

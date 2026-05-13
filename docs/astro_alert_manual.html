@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroAlert — User Manual</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box }
+body {
+  background:#08101c;
+  color:#c8dce8;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+  font-size:14px;
+  line-height:1.7;
+  max-width:860px;
+  margin:0 auto;
+  padding:40px 28px 80px;
+}
+
+/* ── Typography ── */
+h1 { font-size:36px; font-weight:900; letter-spacing:2px; text-transform:uppercase;
+     color:#e8f4ff; margin-bottom:4px }
+h2 { font-size:20px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase;
+     color:#4090c0; margin:48px 0 16px; padding-bottom:8px;
+     border-bottom:1px solid #152535 }
+h3 { font-size:14px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+     color:#3dba50; margin:28px 0 10px }
+p  { margin-bottom:14px; color:#90b0c8 }
+a  { color:#4090c0; text-decoration:none }
+a:hover { text-decoration:underline }
+strong { color:#c8dce8 }
+em { color:#a0c0d8; font-style:normal; font-weight:600 }
+
+/* ── Header ── */
+.page-header {
+  background:#0c1420;
+  border:1px solid #152535;
+  border-radius:8px;
+  padding:32px 36px 28px;
+  margin-bottom:40px;
+}
+.tagline { font-size:13px; color:#406080; margin-top:6px; letter-spacing:.5px }
+.version { display:inline-block; background:#102040; color:#4080c0;
+           font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px;
+           margin-top:14px; letter-spacing:1px }
+
+/* ── Table of Contents ── */
+.toc {
+  background:#0c1828;
+  border:1px solid #152535;
+  border-radius:6px;
+  padding:20px 24px;
+  margin-bottom:40px;
+}
+.toc-title { font-size:11px; font-weight:700; letter-spacing:2px;
+             color:#406080; text-transform:uppercase; margin-bottom:12px }
+.toc ol { padding-left:20px }
+.toc li { padding:3px 0; color:#7090a0 }
+.toc a { color:#7090a0 }
+.toc a:hover { color:#4090c0 }
+
+/* ── Info boxes ── */
+.box {
+  border-radius:6px;
+  padding:16px 20px;
+  margin:20px 0;
+}
+.box-go   { background:#0a2010; border-left:3px solid #3dba50 }
+.box-warn { background:#201808; border-left:3px solid #f0c040 }
+.box-info { background:#0a1628; border-left:3px solid #3060a0 }
+.box-title { font-size:11px; font-weight:700; letter-spacing:1.5px;
+             text-transform:uppercase; margin-bottom:6px }
+.box-go   .box-title { color:#3dba50 }
+.box-warn .box-title { color:#f0c040 }
+.box-info .box-title { color:#4080c0 }
+
+/* ── Score meters ── */
+.score-row { display:flex; gap:16px; margin:20px 0; flex-wrap:wrap }
+.score-block {
+  flex:1; min-width:180px;
+  background:#0c1828; border:1px solid #152535; border-radius:6px;
+  padding:16px;
+}
+.score-label { font-size:11px; font-weight:700; letter-spacing:1.5px;
+               text-transform:uppercase; color:#406080; margin-bottom:8px }
+.score-bar-bg { height:6px; background:#152535; border-radius:3px; margin:8px 0 4px }
+.score-bar    { height:6px; border-radius:3px }
+.bar-green  { background:#3dba50 }
+.bar-yellow { background:#f0c040 }
+.bar-red    { background:#e05050 }
+.score-desc { font-size:11px; color:#607080 }
+
+/* ── Tables ── */
+table { width:100%; border-collapse:collapse; margin:16px 0 24px }
+th {
+  font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:#406080; padding:8px 12px; text-align:left;
+  border-bottom:1px solid #152535;
+}
+td { padding:9px 12px; font-size:13px; color:#90b0c8;
+     border-bottom:1px solid #0f1e2e }
+tr:last-child td { border-bottom:none }
+td strong { color:#c8dce8 }
+td em { color:#3dba50 }
+
+/* ── Target card example ── */
+.example-card {
+  background:#0c1828; border:1px solid #152535; border-radius:6px;
+  overflow:hidden; display:flex; max-width:380px; margin:20px 0;
+}
+.example-img {
+  width:120px; min-height:120px; background:#0a1628;
+  display:flex; align-items:center; justify-content:center;
+  color:#3060a0; font-size:28px; flex-shrink:0;
+}
+.example-body { padding:12px 14px }
+.example-rank { font-size:10px; font-weight:700; color:#3060a0;
+                text-transform:uppercase; letter-spacing:1px }
+.example-name { font-size:15px; font-weight:700; color:#e0f0ff; margin-top:2px }
+.example-cat  { font-size:11px; color:#507090; margin-top:1px }
+.example-bullets { list-style:none; margin-top:8px }
+.example-bullets li { font-size:11px; color:#90b0c8; padding:1.5px 0;
+                       display:flex; gap:5px; align-items:flex-start }
+.example-bullets li::before { content:"✓"; color:#3dba50; font-size:10px; margin-top:1px }
+.example-footer {
+  margin-top:10px; padding-top:8px; border-top:1px solid #152535;
+  display:flex; justify-content:space-between; font-size:10px;
+}
+.example-time { color:#a0c0d8 }
+.example-alt  { color:#607080 }
+
+/* ── Step list ── */
+.steps { list-style:none; margin:16px 0 }
+.steps li {
+  display:flex; gap:14px; align-items:flex-start;
+  padding:12px 0; border-bottom:1px solid #0f1e2e;
+}
+.steps li:last-child { border-bottom:none }
+.step-num {
+  background:#102040; color:#4080c0; width:26px; height:26px;
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; flex-shrink:0; margin-top:2px;
+}
+.step-text { color:#90b0c8; font-size:13px }
+.step-text strong { color:#c8dce8 }
+
+/* ── Code blocks ── */
+code {
+  font-family:'SF Mono',Menlo,Consolas,monospace;
+  font-size:12px; background:#0a1628; color:#7ab8d8;
+  padding:2px 6px; border-radius:3px;
+}
+pre {
+  background:#0a1628; border:1px solid #152535; border-radius:6px;
+  padding:16px 18px; overflow-x:auto; margin:14px 0 20px;
+  font-family:'SF Mono',Menlo,Consolas,monospace;
+  font-size:12px; line-height:1.6; color:#7ab8d8;
+}
+pre .comment { color:#406080 }
+pre .key     { color:#4090c0 }
+pre .val     { color:#3dba50 }
+
+/* ── Object type pills ── */
+.pill {
+  display:inline-block; padding:2px 8px; border-radius:10px;
+  font-size:11px; font-weight:600; margin:2px 3px;
+}
+.pill-nebula  { background:#1a0a0a; color:#e05050; border:1px solid #501a1a }
+.pill-galaxy  { background:#0a0e1a; color:#4090c0; border:1px solid #1a3060 }
+.pill-cluster { background:#0a1a0a; color:#3dba50; border:1px solid #1a5025 }
+.pill-planet  { background:#1a1400; color:#f0c040; border:1px solid #503a00 }
+
+/* ── Example card ── */
+.card-example {
+  margin:28px 0;
+  border:1px solid #152535;
+  border-radius:8px;
+  overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.6);
+}
+.card-example img {
+  width:100%;
+  display:block;
+}
+.card-caption {
+  background:#0c1420;
+  padding:10px 16px;
+  font-size:12px;
+  color:#506070;
+  text-align:center;
+  border-top:1px solid #152535;
+}
+
+/* ── Divider ── */
+hr { border:none; border-top:1px solid #152535; margin:40px 0 }
+
+/* ── Footer ── */
+.page-footer {
+  margin-top:60px; padding-top:20px; border-top:1px solid #152535;
+  font-size:11px; color:#304050; text-align:center;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ HEADER -->
+<div class="page-header">
+  <h1>&#9733; AstroAlert</h1>
+  <div class="tagline">Nightly Astrophotography Go/No-Go System — User Manual</div>
+  <div class="version">v1.4 — May 2026</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TOC -->
+<div class="toc">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#overview">What Is AstroAlert?</a></li>
+    <li><a href="#example">Example Report Card</a></li>
+    <li><a href="#report-card">Understanding the Report Card</a></li>
+    <li><a href="#scoring">The GO / NO-GO Score</a></li>
+    <li><a href="#targets">Target Recommendations</a></li>
+    <li><a href="#images">DSO Images</a></li>
+    <li><a href="#timing">Timing Windows &amp; Compass</a></li>
+    <li><a href="#object-types">Deep-Sky Object Types</a></li>
+    <li><a href="#installation">Installation</a></li>
+    <li><a href="#configuration">Configuration</a></li>
+    <li><a href="#scheduling">Scheduling Alerts</a></li>
+    <li><a href="#equipment">Default Equipment Profile</a></li>
+    <li><a href="#faq">FAQ</a></li>
+  </ol>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ OVERVIEW -->
+<h2 id="overview">1. What Is AstroAlert?</h2>
+
+<p>AstroAlert is an open-source Python application that automatically evaluates tonight's imaging conditions for one or more observing sites and sends you a nightly email alert with a full-color <strong>Report Card</strong> attached as a PDF-quality PNG image.</p>
+
+<p>It pulls live data from three independent weather and atmospheric sources, combines them into a single 0–100 score, then recommends the best 12 deep-sky objects to photograph — in ranked order — based on your location, the time of year, and what will be highest in the sky during the darkest part of the night.</p>
+
+<div class="box box-go">
+  <div class="box-title">Designed for OSC Imagers</div>
+  AstroAlert is optimised for one-shot colour (OSC) cameras on medium-aperture refractors and Newtonians. The default profile targets the ZWO ASI2600MC-Air on an Askar 120 APO (672 mm f/5.6, ~2–3° field of view), but every parameter is configurable.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ EXAMPLE CARD -->
+<h2 id="example">2. Example Report Card</h2>
+
+<p>This is a real report card generated for Durham Home on a clear spring night. The top row shows the three highest-ranked imaging targets; the middle six are solid alternatives; the bottom row are late-night picks that peak after midnight.</p>
+
+<div class="card-example">
+  <img src="example_card.png" alt="AstroAlert example report card">
+  <div class="card-caption">Durham Home · May 2026 · GO night · 12 targets ranked by imaging score</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ REPORT CARD -->
+<h2 id="report-card">3. Understanding the Report Card</h2>
+
+<p>The Report Card is a 900-pixel-wide PNG image attached to every alert email. It is divided into five sections:</p>
+
+<table>
+  <tr><th>Section</th><th>What it shows</th></tr>
+  <tr><td><strong>Header</strong></td><td>Site name, Bortle class, drive time, current local time</td></tr>
+  <tr><td><strong>Banner</strong></td><td>GO or NO-GO verdict with a plain-English summary</td></tr>
+  <tr><td><strong>Best 3 Targets</strong></td><td>Top-ranked imaging targets for the evening</td></tr>
+  <tr><td><strong>Good Options (6)</strong></td><td>Solid second-tier targets worth setting up on</td></tr>
+  <tr><td><strong>Late Night Picks (3)</strong></td><td>Objects that don't peak until after midnight</td></tr>
+</table>
+
+<p>Below the targets, a two-column panel shows <strong>Tonight's Conditions</strong> (weather, seeing, moon, darkness scores) and a <strong>Game Plan</strong> — a step-by-step guide for the session written by AI based on the night's conditions.</p>
+
+
+<!-- ═══════════════════════════════════════════════════════ SCORING -->
+<h2 id="scoring">4. The GO / NO-GO Score</h2>
+
+<p>The composite score is a weighted average of three sub-scores, each from 0–100:</p>
+
+<div class="score-row">
+  <div class="score-block">
+    <div class="score-label">Weather (50%)</div>
+    <p style="font-size:12px;margin-bottom:6px">Cloud cover and precipitation from Open-Meteo. Clear skies score high; any cloud above 30% cuts the score significantly.</p>
+    <div class="score-bar-bg"><div class="score-bar bar-green" style="width:85%"></div></div>
+    <div class="score-desc">85 — mostly clear</div>
+  </div>
+  <div class="score-block">
+    <div class="score-label">Seeing (30%)</div>
+    <p style="font-size:12px;margin-bottom:6px">Atmospheric turbulence from 7timer.info. Affects star sharpness and SNR. Scored 1–8 on the Antoniadi scale.</p>
+    <div class="score-bar-bg"><div class="score-bar bar-yellow" style="width:60%"></div></div>
+    <div class="score-desc">60 — average seeing</div>
+  </div>
+  <div class="score-block">
+    <div class="score-label">Moon (20%)</div>
+    <p style="font-size:12px;margin-bottom:6px">Illumination percentage and whether the moon sets before astronomical twilight ends.</p>
+    <div class="score-bar-bg"><div class="score-bar bar-green" style="width:90%"></div></div>
+    <div class="score-desc">90 — new moon, no impact</div>
+  </div>
+</div>
+
+<h3>Score Thresholds</h3>
+<table>
+  <tr><th>Score</th><th>Verdict</th><th>Meaning</th></tr>
+  <tr><td><em>70–100</em></td><td><strong>GO</strong></td><td>Image tonight — conditions are good to excellent</td></tr>
+  <tr><td style="color:#f0c040">45–69</td><td><strong>Marginal</strong></td><td>Possible but not ideal; check the warnings</td></tr>
+  <tr><td style="color:#e05050">0–44</td><td><strong>NO-GO</strong></td><td>Stay home — poor clouds, bad seeing, or bright moon</td></tr>
+</table>
+
+<div class="box box-warn">
+  <div class="box-title">Bortle-Aware Scoring</div>
+  At a dark Bortle 2–3 site the moon weight is higher (a bright moon ruins a dark-sky trip) and the weather threshold is stricter. At a backyard Bortle 6–7 site the weights shift toward seeing, since light pollution already limits your signal.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ TARGETS -->
+<h2 id="targets">5. Target Recommendations</h2>
+
+<p>AstroAlert scores every object in its catalogue against six factors and returns the best 12 for your site and date. The ranking algorithm is designed for OSC imaging — it weights large, emission-bright objects above small planetary nebulae, and strongly favours objects that peak early in the night.</p>
+
+<h3>Ranking Factors</h3>
+<table>
+  <tr><th>Factor</th><th>Rationale</th></tr>
+  <tr><td><strong>Peak altitude</strong></td><td>Higher = less atmosphere = sharper, brighter images</td></tr>
+  <tr><td><strong>Object type</strong></td><td>Emission nebulae rank highest for OSC imaging; planetary nebulae lowest</td></tr>
+  <tr><td><strong>Angular size</strong></td><td>Large objects fill your field of view and collect more total signal</td></tr>
+  <tr><td><strong>Brightness</strong></td><td>Brighter objects give better signal-to-noise per sub-frame</td></tr>
+  <tr><td><strong>Timing</strong></td><td>Objects peaking early in the night rank above late-night targets</td></tr>
+  <tr><td><strong>Variety</strong></td><td>The card always shows a mix of types — no single category sweeps all 12 slots</td></tr>
+</table>
+
+<h3>Reading a Target Card</h3>
+
+<div class="example-card">
+  <div class="example-img">&#9733;</div>
+  <div class="example-body">
+    <div class="example-rank">1st Choice</div>
+    <div class="example-name">Whirlpool Galaxy</div>
+    <div class="example-cat">M51 · Galaxy</div>
+    <ul class="example-bullets">
+      <li>Peak 78° NNE</li>
+      <li>Window: 7h above 25°</li>
+      <li>Interacting pair with NGC 5195</li>
+    </ul>
+    <div class="example-footer">
+      <span class="example-time">8:30 PM – 3:30 AM</span>
+      <span class="example-alt">Peak 78°</span>
+    </div>
+  </div>
+</div>
+
+<table>
+  <tr><th>Field</th><th>Meaning</th></tr>
+  <tr><td><strong>Rank label</strong></td><td>1st–3rd Choice, 4th–9th Option, Late Pick</td></tr>
+  <tr><td><strong>Common name</strong></td><td>Popular name (e.g. Whirlpool Galaxy)</td></tr>
+  <tr><td><strong>Catalogue · Type</strong></td><td>Messier/NGC designation and object class</td></tr>
+  <tr><td><strong>Bullet points</strong></td><td>Peak altitude + compass, hours above 25°, short description</td></tr>
+  <tr><td><strong>Footer — left</strong></td><td>Time window when the object is above 25° altitude (local time)</td></tr>
+  <tr><td><strong>Footer — right</strong></td><td>Peak altitude in degrees</td></tr>
+</table>
+
+
+<!-- ═══════════════════════════════════════════════════════ IMAGES -->
+<h2 id="images">6. DSO Images</h2>
+
+<p>Each target card includes a real photograph of the object, not a simulated or artistic rendering. Images are sourced in priority order:</p>
+
+<ol style="padding-left:20px; margin:14px 0 20px; color:#90b0c8">
+  <li style="padding:5px 0"><strong style="color:#c8dce8">SDSS SkyServer</strong> — Sloan Digital Sky Survey natural-colour JPEG cutouts. Best quality for galaxies and clusters (covers declination −10° to +65°, avoids the Milky Way).</li>
+  <li style="padding:5px 0"><strong style="color:#c8dce8">Legacy Survey DR10</strong> — grz colour composites from the DESI Legacy Imaging Survey. Good southern sky coverage.</li>
+  <li style="padding:5px 0"><strong style="color:#c8dce8">Wikipedia / ESO</strong> — For nebulae and other objects outside the SDSS footprint, the main Wikipedia photo is fetched — typically a Hubble, ESO, or professional amateur image.</li>
+  <li style="padding:5px 0"><strong style="color:#c8dce8">DSS2 Red+Blue composite</strong> — Full-sky fallback. A two-band Digitized Sky Survey composite with sky-background subtraction and arcsinh stretch.</li>
+</ol>
+
+<p>Images are cached locally after first download. Cache location: <code>~/Library/Application Support/AstroAlert/dso_images/</code>. To force a refresh, delete the <code>.png</code> file for that object.</p>
+
+
+<!-- ═══════════════════════════════════════════════════════ TIMING -->
+<h2 id="timing">7. Timing Windows &amp; Compass Direction</h2>
+
+<p>The <em>window</em> shown at the bottom of each target card is the span of time during tonight's imaging session (between astronomical twilight) when that object is above <strong>25° altitude</strong>. Below 25° there is too much atmospheric extinction for quality imaging.</p>
+
+<p>The compass direction (e.g. <em>NNE</em>, <em>SSE</em>) is the azimuth where the object peaks. This helps you quickly confirm your mount can reach it without hitting a pier, tree, or building.</p>
+
+<div class="box box-info">
+  <div class="box-title">Why 25°?</div>
+  At 25° altitude you're looking through roughly 2.4× more atmosphere than at the zenith. Below 20° you lose significant sharpness and signal even on good nights. 25° is a practical minimum for OSC imaging with a longer focal length.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ OBJECT TYPES -->
+<h2 id="object-types">8. Deep-Sky Object Types</h2>
+
+<p>AstroAlert recommends objects from seven categories. Each behaves differently through an OSC camera:</p>
+
+<table>
+  <tr><th>Type</th><th>Notes for OSC imagers</th></tr>
+  <tr>
+    <td><span class="pill pill-nebula">Emission Nebula</span></td>
+    <td>Dominated by Hα (red). Excellent SNR in dark skies. Consider a dual-narrowband filter at light-polluted sites.</td>
+  </tr>
+  <tr>
+    <td><span class="pill pill-nebula">Supernova Remnant</span></td>
+    <td>Large, faint Hα and OIII filaments. Needs long total exposure time. Best with a narrowband filter.</td>
+  </tr>
+  <tr>
+    <td><span class="pill pill-nebula">Reflection Nebula</span></td>
+    <td>Blue-scattered light from nearby stars. No line emission — broadband only, no benefit from narrowband.</td>
+  </tr>
+  <tr>
+    <td><span class="pill pill-galaxy">Galaxy</span></td>
+    <td>Broadband targets. Darker skies matter more than for nebulae. Good seeing is critical for spiral arm detail.</td>
+  </tr>
+  <tr>
+    <td><span class="pill pill-cluster">Globular Cluster</span></td>
+    <td>Bright, forgiving targets. Great for shorter nights or when conditions are borderline.</td>
+  </tr>
+  <tr>
+    <td><span class="pill pill-cluster">Open Cluster</span></td>
+    <td>Often very large — check it fits your FOV. Short exposures work well.</td>
+  </tr>
+  <tr>
+    <td><span class="pill pill-planet">Planetary Nebula</span></td>
+    <td>Usually very small (arc-seconds). Requires good seeing and longer focal length.</td>
+  </tr>
+</table>
+
+
+<!-- ═══════════════════════════════════════════════════════ INSTALLATION -->
+<h2 id="installation">9. Installation</h2>
+
+<p>AstroAlert requires <strong>Python 3.11+</strong> and a few standard astronomy and imaging libraries.</p>
+
+<ul class="steps">
+  <li>
+    <div class="step-num">1</div>
+    <div class="step-text"><strong>Clone the repository</strong><br>
+    <code>git clone https://github.com/paulydavis/astro-alert.git</code><br>
+    <code>cd astro-alert</code></div>
+  </li>
+  <li>
+    <div class="step-num">2</div>
+    <div class="step-text"><strong>Create a virtual environment</strong><br>
+    <code>python3 -m venv .venv &amp;&amp; source .venv/bin/activate</code></div>
+  </li>
+  <li>
+    <div class="step-num">3</div>
+    <div class="step-text"><strong>Install dependencies</strong><br>
+    <code>pip install -r requirements.txt</code></div>
+  </li>
+  <li>
+    <div class="step-num">4</div>
+    <div class="step-text"><strong>Copy and fill in credentials</strong><br>
+    <code>cp .env.example .env</code> then edit <code>.env</code> — see Configuration section.</div>
+  </li>
+  <li>
+    <div class="step-num">5</div>
+    <div class="step-text"><strong>Run a test alert</strong><br>
+    <code>python astro_alert.py --dry-run</code><br>
+    This scores tonight and prints the result without sending email.</div>
+  </li>
+  <li>
+    <div class="step-num">6</div>
+    <div class="step-text"><strong>Open the GUI</strong><br>
+    <code>python gui.py</code><br>
+    Browse sites, generate cards, and preview alerts interactively.</div>
+  </li>
+</ul>
+
+
+<!-- ═══════════════════════════════════════════════════════ CONFIGURATION -->
+<h2 id="configuration">10. Configuration</h2>
+
+<h3>The .env File</h3>
+<p>Credentials and API keys live in <code>.env</code> in the project root. <strong>Never commit this file.</strong></p>
+
+<pre>
+<span class="comment"># Email — SMTP credentials for sending alerts</span>
+<span class="key">SMTP_HOST</span>=<span class="val">smtp.gmail.com</span>
+<span class="key">SMTP_PORT</span>=<span class="val">587</span>
+<span class="key">SMTP_USER</span>=<span class="val">you@gmail.com</span>
+<span class="key">SMTP_PASS</span>=<span class="val">your-app-password</span>
+<span class="key">ALERT_TO</span>=<span class="val">you@gmail.com,partner@gmail.com</span>
+
+<span class="comment"># Optional — OpenAI key for AI-written game plans</span>
+<span class="key">OPENAI_API_KEY</span>=<span class="val">sk-...</span>
+
+<span class="comment"># Optional — Twilio for SMS alerts</span>
+<span class="key">TWILIO_ACCOUNT_SID</span>=<span class="val">ACxxx</span>
+<span class="key">TWILIO_AUTH_TOKEN</span>=<span class="val">xxx</span>
+<span class="key">TWILIO_FROM_NUMBER</span>=<span class="val">+1xxxxxxxxxx</span>
+<span class="key">TWILIO_TO_NUMBER</span>=<span class="val">+1xxxxxxxxxx</span>
+</pre>
+
+<h3>Sites (sites.json)</h3>
+<p>Add as many sites as you like. Set <code>active_site</code> to the key you want alerts for by default.</p>
+
+<pre>
+{
+  <span class="key">"active_site"</span>: <span class="val">"dark_field"</span>,
+  <span class="key">"sites"</span>: {
+    <span class="key">"dark_field"</span>: {
+      <span class="key">"name"</span>:         <span class="val">"Staunton River State Park"</span>,
+      <span class="key">"lat"</span>:          <span class="val">36.696</span>,
+      <span class="key">"lon"</span>:          <span class="val">-78.685</span>,
+      <span class="key">"elevation_m"</span>:  <span class="val">110</span>,
+      <span class="key">"bortle"</span>:       <span class="val">2</span>,
+      <span class="key">"timezone"</span>:     <span class="val">"America/New_York"</span>,
+      <span class="key">"drive_min"</span>:    <span class="val">120</span>
+    }
+  }
+}
+</pre>
+
+<div class="box box-info">
+  <div class="box-title">Finding Your Coordinates</div>
+  Right-click any location in Google Maps and click the coordinates at the top of the popup. Use negative longitude for locations west of the prime meridian (most of North America).
+</div>
+
+<h3>CLI Flags</h3>
+<table>
+  <tr><th>Flag</th><th>Effect</th></tr>
+  <tr><td><code>--site backyard</code></td><td>Override the active site for this run</td></tr>
+  <tr><td><code>--dry-run</code></td><td>Score and print — don't send any email</td></tr>
+  <tr><td><code>--only-if-go</code></td><td>Skip email if no sites score GO (good for daily nudge cron)</td></tr>
+  <tr><td><code>--date 2026-06-15</code></td><td>Score a future or past date</td></tr>
+</table>
+
+
+<!-- ═══════════════════════════════════════════════════════ SCHEDULING -->
+<h2 id="scheduling">11. Scheduling Alerts</h2>
+
+<p>The most useful setup is a cron job that runs at 6 PM local time every day. You get the alert just before sunset so you know whether to pack the car.</p>
+
+<pre>
+<span class="comment"># Edit your crontab: crontab -e</span>
+<span class="comment"># Run AstroAlert every day at 6 PM local time</span>
+<span class="val">0 18 * * *</span> cd /path/to/astro-alert &amp;&amp; .venv/bin/python astro_alert.py --only-if-go
+</pre>
+
+<p>The <code>--only-if-go</code> flag means you only receive an email on nights worth going out. On bad nights, silence is the alert.</p>
+
+<div class="box box-warn">
+  <div class="box-title">Gmail App Passwords</div>
+  If you use Gmail with 2-factor authentication (recommended), generate an <strong>App Password</strong> at <a href="https://myaccount.google.com/apppasswords">myaccount.google.com/apppasswords</a> and use that as <code>SMTP_PASS</code>. Your regular Gmail password will not work with SMTP.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ EQUIPMENT -->
+<h2 id="equipment">12. Equipment Profile</h2>
+
+<p>Your equipment profile is stored in <code>sites.json</code> under the <code>"equipment"</code> key and can be edited in the app's <strong>Settings → Equipment</strong> section. It appears on every report card and is passed to the AI when generating session game plans.</p>
+
+<table>
+  <tr><th>Field</th><th>Key in sites.json</th><th>Example</th></tr>
+  <tr><td><strong>Camera</strong></td><td><code>camera</code></td><td>ZWO ASI2600MC-Air</td></tr>
+  <tr><td><strong>Telescope</strong></td><td><code>telescope</code></td><td>Askar 120 APO</td></tr>
+  <tr><td><strong>Reducer / FF</strong></td><td><code>reducer</code></td><td>Askar 0.8x field flattener</td></tr>
+  <tr><td><strong>Mount</strong></td><td><code>mount</code></td><td>ZWO AM5N</td></tr>
+  <tr><td><strong>Focal length</strong></td><td><code>focal_length_mm</code></td><td>672</td></tr>
+  <tr><td><strong>Focal ratio</strong></td><td><code>focal_ratio</code></td><td>f/5.6</td></tr>
+  <tr><td><strong>Field of view</strong></td><td><code>fov_deg</code></td><td>2.3 x 1.6</td></tr>
+</table>
+
+<p>To update your equipment, open the GUI and go to <strong>Settings → Equipment</strong>, fill in the fields, and click <em>Save Equipment</em>. Alternatively edit <code>sites.json</code> directly:</p>
+
+<pre>
+{
+  <span class="key">"equipment"</span>: {
+    <span class="key">"camera"</span>:           <span class="val">"ZWO ASI2600MC-Air"</span>,
+    <span class="key">"telescope"</span>:        <span class="val">"Askar 120 APO"</span>,
+    <span class="key">"reducer"</span>:          <span class="val">"Askar 0.8x field flattener"</span>,
+    <span class="key">"mount"</span>:            <span class="val">"ZWO AM5N"</span>,
+    <span class="key">"focal_length_mm"</span>:  <span class="val">672</span>,
+    <span class="key">"focal_ratio"</span>:      <span class="val">"f/5.6"</span>,
+    <span class="key">"fov_deg"</span>:          <span class="val">"2.3 x 1.6"</span>
+  }
+}
+</pre>
+
+<p>The field-of-view value influences which targets score highest. Large emission nebulae (M42, M8) or galaxy groups (M81/M82) that fill a 2–3° frame rank above small objects that would need significant cropping.</p>
+
+
+<!-- ═══════════════════════════════════════════════════════ FAQ -->
+<h2 id="faq">13. FAQ</h2>
+
+<h3>Why is an object I want not on the list?</h3>
+<p>The object may not be above 25° for long enough tonight, or a higher-ranked object of the same type already claimed its slot — the system limits how many of any one type appear so the card stays varied. Try checking on a different night when the object is better placed.</p>
+
+<h3>Can I run it for multiple sites?</h3>
+<p>Yes. Add all your sites to <code>sites.json</code>. The alert email and attached cards will cover each site independently, so a club can receive one email with cards for several dark-sky sites.</p>
+
+<h3>Does it work outside North America?</h3>
+<p>Yes. Open-Meteo and 7timer.info are global. SDSS coverage is limited to the northern sky; for southern hemisphere objects the Legacy Survey and DSS fallbacks are used automatically.</p>
+
+<h3>What if the OpenAI key is missing?</h3>
+<p>The card and email still generate fully — a rule-based fallback writes the Game Plan and summary text. The OpenAI key only adds richer narrative language.</p>
+
+<h3>Can I use it with a narrowband filter?</h3>
+<p>Yes — the target recommendations still apply. Emission nebulae rank highest and those are exactly the objects that benefit most from a dual-narrowband or Hα filter. The GO/NO-GO score is calculated for broadband imaging, so on nights the score is marginal you may still get good narrowband results since that filter cuts moonlight and light pollution.</p>
+
+<h3>Where is data cached?</h3>
+<p>All cached data lives in <code>~/Library/Application Support/AstroAlert/</code> (macOS) or <code>~/.local/share/AstroAlert/</code> (Linux). DSO images are in the <code>dso_images/</code> subdirectory. Delete individual <code>.png</code> files to force a fresh download.</p>
+
+
+<hr>
+<div class="page-footer">
+  AstroAlert is open source — <a href="https://github.com/paulydavis/astro-alert">github.com/paulydavis/astro-alert</a><br>
+  Questions or contributions welcome via GitHub Issues and Pull Requests.
+</div>
+
+</body>
+</html>

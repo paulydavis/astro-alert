@@ -1747,7 +1747,50 @@ class AstroAlertApp(tk.Tk):
         ttk.Label(inner, textvariable=self._home_status_var,
                   style="Dim.TLabel").pack(pady=(4, 24))
 
+        # ── Equipment ──────────────────────────────────────────────────────────────
+        ttk.Separator(inner).pack(fill="x", pady=(24, 0))
+        ttk.Label(inner, text="Equipment",
+                  font=(FONT_PROP, 15, "bold")).pack(pady=(16, 4))
+        ttk.Label(inner, text="Shown on report cards and used to personalise AI game plans.",
+                  style="Sub.TLabel").pack(pady=(0, 16))
+
+        eq_card = ttk.Frame(inner, style="Card.TFrame")
+        eq_card.pack(fill="x", ipadx=28, ipady=16)
+        eq_card.columnconfigure(1, weight=1)
+
+        self._eq_camera_var     = tk.StringVar()
+        self._eq_telescope_var  = tk.StringVar()
+        self._eq_reducer_var    = tk.StringVar()
+        self._eq_mount_var      = tk.StringVar()
+        self._eq_focal_var      = tk.StringVar()
+        self._eq_ratio_var      = tk.StringVar()
+        self._eq_fov_var        = tk.StringVar()
+
+        eq_fields = [
+            ("Camera",         self._eq_camera_var),
+            ("Telescope",      self._eq_telescope_var),
+            ("Reducer/FF",     self._eq_reducer_var),
+            ("Mount",          self._eq_mount_var),
+            ("Focal length mm",self._eq_focal_var),
+            ("Focal ratio",    self._eq_ratio_var),
+            ("FOV (deg)",      self._eq_fov_var),
+        ]
+        for row_idx, (label, var) in enumerate(eq_fields):
+            ttk.Label(eq_card, text=label + ":", style="CardDim.TLabel").grid(
+                row=row_idx, column=0, sticky="w", pady=6, padx=(16, 12))
+            ttk.Entry(eq_card, textvariable=var, font=(FONT_PROP, 12),
+                      width=36).grid(row=row_idx, column=1, sticky="ew", pady=6)
+
+        self._eq_status_var = tk.StringVar()
+        eq_btn_row = ttk.Frame(inner)
+        eq_btn_row.pack(pady=(14, 4))
+        ttk.Button(eq_btn_row, text="Save Equipment", style="Accent.TButton",
+                   command=self._save_equipment).pack()
+        ttk.Label(inner, textvariable=self._eq_status_var,
+                  style="Dim.TLabel").pack(pady=(4, 24))
+
         self.after(50, self._load_credentials_to_form)
+        self.after(80, self._load_equipment_to_form)
         self.after(100, lambda: canvas.configure(scrollregion=canvas.bbox("all")))
 
     def _load_credentials_to_form(self):
@@ -1869,6 +1912,35 @@ class AstroAlertApp(tk.Tk):
                             f"Home set to {lat:.4f}, {lon:.4f}.\n"
                             "Drive times will now calculate automatically when adding sites.",
                             parent=self)
+
+    def _load_equipment_to_form(self):
+        from site_manager import get_equipment
+        eq = get_equipment()
+        self._eq_camera_var.set(eq.get("camera", ""))
+        self._eq_telescope_var.set(eq.get("telescope", ""))
+        self._eq_reducer_var.set(eq.get("reducer", ""))
+        self._eq_mount_var.set(eq.get("mount", ""))
+        self._eq_focal_var.set(str(eq.get("focal_length_mm", "")))
+        self._eq_ratio_var.set(eq.get("focal_ratio", ""))
+        self._eq_fov_var.set(eq.get("fov_deg", ""))
+
+    def _save_equipment(self):
+        from site_manager import set_equipment
+        try:
+            focal = self._eq_focal_var.get().strip()
+            eq = {
+                "camera":           self._eq_camera_var.get().strip(),
+                "telescope":        self._eq_telescope_var.get().strip(),
+                "reducer":          self._eq_reducer_var.get().strip(),
+                "mount":            self._eq_mount_var.get().strip(),
+                "focal_length_mm":  int(focal) if focal.isdigit() else focal,
+                "focal_ratio":      self._eq_ratio_var.get().strip(),
+                "fov_deg":          self._eq_fov_var.get().strip(),
+            }
+            set_equipment(eq)
+            self._eq_status_var.set("Equipment saved.")
+        except Exception as exc:
+            self._eq_status_var.set(f"Error: {exc}")
 
     def _detect_home_location(self):
         self._home_status_var.set("")
@@ -2111,6 +2183,7 @@ class AstroAlertApp(tk.Tk):
                     window = compute_imaging_window(site.lat, site.lon, target_date)
                     targets = get_nightly_targets(site.lat, site.lon, window,
                                                    max_results=12) if window else []
+                    from site_manager import equipment_string
                     card = CardInput(
                         site_name=site.name,
                         site_key=site.key,
@@ -2121,6 +2194,7 @@ class AstroAlertApp(tk.Tk):
                         moon=moon,
                         targets=targets,
                         drive_min=site.drive_min,
+                        equipment=equipment_string(),
                     )
                     png_path = generate_site_card(card, openai_key, output_dir)
                     if png_path is not None:

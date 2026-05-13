@@ -15,6 +15,8 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install -r requirements.txt pyinstaller
+      - name: Install Playwright Chromium
+        run: playwright install chromium
       - name: Build
         run: pyinstaller AstroAlert.spec
       - name: Zip app bundle
@@ -33,12 +35,17 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install -r requirements.txt pyinstaller
+      - name: Install Playwright Chromium
+        run: playwright install chromium
       - name: Build
         run: pyinstaller AstroAlert.spec
+      - name: Zip exe
+        run: cd dist && Compress-Archive -Path AstroAlert.exe -DestinationPath AstroAlert-Windows.zip
+        shell: pwsh
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/AstroAlert.exe
+          path: dist/AstroAlert-Windows.zip
 
   build-linux:
     runs-on: ubuntu-latest
@@ -47,18 +54,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install tkinter
-        run: sudo apt-get install -y python3-tk
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y python3-tk
       - name: Install dependencies
         run: pip install -r requirements.txt pyinstaller
+      - name: Install Playwright Chromium
+        run: playwright install --with-deps chromium
       - name: Build
         run: pyinstaller AstroAlert.spec
       - name: Rename binary
         run: mv dist/AstroAlert dist/AstroAlert-Linux
+      - name: Compress
+        run: cd dist && tar -czf AstroAlert-Linux.tar.gz AstroAlert-Linux
       - uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: dist/AstroAlert-Linux
+          path: dist/AstroAlert-Linux.tar.gz
 
   release:
     needs: [build-macos, build-windows, build-linux]
@@ -70,12 +83,10 @@ jobs:
         with:
           merge-multiple: true
           path: dist
-      - name: Rename Windows exe
-        run: mv dist/AstroAlert.exe dist/AstroAlert-Windows.exe
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
             dist/AstroAlert-macOS.zip
-            dist/AstroAlert-Windows.exe
-            dist/AstroAlert-Linux
+            dist/AstroAlert-Windows.zip
+            dist/AstroAlert-Linux.tar.gz

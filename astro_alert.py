@@ -10,7 +10,7 @@ from moon import get_moon_info
 from scorer import score_night
 from scoring_weights import load_weights
 from seeing import fetch_seeing
-from site_manager import add_site, get_active_site, list_sites
+from site_manager import add_site, get_active_site, list_sites, equipment_string
 from weather import fetch_weather
 
 
@@ -79,6 +79,7 @@ def _generate_cards(site_report_pairs: list, target_date, openai_key: str) -> di
                 moon=report.moon,
                 targets=targets,
                 drive_min=site.drive_min,
+                equipment=equipment_string(),
             )
             png_path = generate_site_card(card, openai_key, output_dir)
             if png_path:

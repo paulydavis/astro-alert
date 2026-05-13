@@ -61,6 +61,40 @@ def list_sites() -> list[tuple[str, Site, bool]]:
     ]
 
 
+def get_equipment() -> dict:
+    """Return the equipment dict from sites.json, or an empty dict if not set."""
+    data = _load_raw()
+    return data.get("equipment", {})
+
+
+def set_equipment(equipment: dict) -> None:
+    """Write the equipment block back to sites.json."""
+    data = _load_raw()
+    data["equipment"] = equipment
+    _save_raw(data)
+
+
+def equipment_string(eq: Optional[dict] = None) -> str:
+    """Return a one-line equipment summary for card headers and prompts."""
+    if eq is None:
+        eq = get_equipment()
+    if not eq:
+        return "Unknown equipment"
+    parts = []
+    if eq.get("camera"):
+        parts.append(eq["camera"])
+    if eq.get("telescope"):
+        scope = eq["telescope"]
+        if eq.get("reducer"):
+            scope += f" + {eq['reducer']}"
+        parts.append(scope)
+    if eq.get("focal_length_mm"):
+        fl = eq["focal_length_mm"]
+        fr = eq.get("focal_ratio", "")
+        parts.append(f"{fl}mm {fr}".strip())
+    return "  ·  ".join(parts) if parts else "Unknown equipment"
+
+
 def add_site(
     key: str,
     name: str,
