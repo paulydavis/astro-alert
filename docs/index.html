@@ -207,7 +207,7 @@ hr { border:none; border-top:1px solid #152535; margin:40px 0 }
 <div class="page-header">
   <h1>&#9733; AstroAlert</h1>
   <div class="tagline">Nightly Astrophotography Go/No-Go System — User Manual</div>
-  <div class="version">v1.4 — May 2026</div>
+  <div class="version">v1.4.5 — May 2026</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ TOC -->
@@ -226,6 +226,7 @@ hr { border:none; border-top:1px solid #152535; margin:40px 0 }
     <li><a href="#configuration">Configuration</a></li>
     <li><a href="#scheduling">Scheduling Alerts</a></li>
     <li><a href="#equipment">Default Equipment Profile</a></li>
+    <li><a href="#ai">AI Game Plan (Optional)</a></li>
     <li><a href="#faq">FAQ</a></li>
   </ol>
 </div>
@@ -580,7 +581,7 @@ hr { border:none; border-top:1px solid #152535; margin:40px 0 }
 <!-- ═══════════════════════════════════════════════════════ EQUIPMENT -->
 <h2 id="equipment">12. Equipment Profile</h2>
 
-<p>Your equipment profile is stored in <code>sites.json</code> under the <code>"equipment"</code> key and can be edited in the app's <strong>Settings → Equipment</strong> section. It appears on every report card and is passed to the AI when generating session game plans.</p>
+<p>Your equipment profile is stored in <code>sites.json</code> under the <code>"equipment"</code> key and can be edited in the app's <strong>Settings → Equipment</strong> section. It appears on every report card header. If you have an OpenAI API key configured, the equipment details are also passed to the AI to personalise the session game plan — otherwise the game plan is generated from a built-in template.</p>
 
 <table>
   <tr><th>Field</th><th>Example</th></tr>
@@ -593,13 +594,39 @@ hr { border:none; border-top:1px solid #152535; margin:40px 0 }
   <tr><td><strong>Field of view (degrees)</strong></td><td>2.3 x 1.6</td></tr>
 </table>
 
-<p>Go to <strong>Settings → Equipment</strong>, fill in the fields for your setup, and click <em>Save Equipment</em>. The information appears on every report card and is used to personalise the AI-written session game plan.</p>
+<p>Go to <strong>Settings → Equipment</strong>, fill in the fields for your setup, and click <em>Save Equipment</em>. The information appears on every report card. If you have an OpenAI API key set up (see the FAQ), it is also used to personalise the session game plan.</p>
 
 <p>The field-of-view value influences which targets score highest. Large emission nebulae (M42, M8) or galaxy groups (M81/M82) that fill a 2–3° frame rank above small objects that would need significant cropping.</p>
 
 
+<!-- ═══════════════════════════════════════════════════════ AI GAME PLAN -->
+<h2 id="ai">13. AI Game Plan  <span style="font-size:14px;font-weight:400;color:#607080">(Optional)</span></h2>
+
+<p>Each report card includes a <strong>Game Plan</strong> — a short step-by-step guide for the session. By default it is written by a built-in template. If you add an OpenAI API key, the game plan is written by GPT-4o and personalised to your equipment, your site's Bortle class, and tonight's specific conditions.</p>
+
+<div class="box box-info">
+  <div class="box-title">Everything works without it</div>
+  The GO/NO-GO score, all 12 targets, DSO images, timing windows, and the alert email are completely unaffected by whether an API key is present. The only difference is the game plan text.
+</div>
+
+<h3>Setting Up the OpenAI Key</h3>
+<ol style="margin:8px 0 16px 0; padding-left:24px; line-height:2">
+  <li>Go to <a href="https://platform.openai.com">platform.openai.com</a> and sign in or create an account. OpenAI requires a credit card — usage is billed per request (see cost note below).</li>
+  <li>In the left sidebar click <strong>API keys</strong>, then <strong>Create new secret key</strong>.</li>
+  <li>Copy the key — it is only shown once.</li>
+  <li>In AstroAlert open <strong>Settings</strong>, scroll to the <strong>AI Game Plan</strong> section, paste the key, and click <em>Save API Key</em>.</li>
+</ol>
+
+<div class="box box-warn">
+  <div class="box-title">Cost</div>
+  OpenAI charges per use. Each report card generation uses roughly 500–800 tokens. At current pricing (~$2.50 per million tokens) that is less than a cent per card — a full year of nightly alerts costs about $1–2 total.
+  <br><br>
+  To monitor usage, visit <strong>platform.openai.com/usage</strong> — it shows every call, token count, and cost broken down by day. To cap your spending, go to <strong>Billing → Usage limits</strong> and set a monthly maximum. OpenAI will stop making calls if the limit is reached.
+</div>
+
+
 <!-- ═══════════════════════════════════════════════════════ FAQ -->
-<h2 id="faq">13. FAQ</h2>
+<h2 id="faq">14. FAQ</h2>
 
 <h3>Why is an object I want not on the list?</h3>
 <p>The object may not be above 25° for long enough tonight, or a higher-ranked object of the same type already claimed its slot — the system limits how many of any one type appear so the card stays varied. Try checking on a different night when the object is better placed.</p>
@@ -610,8 +637,8 @@ hr { border:none; border-top:1px solid #152535; margin:40px 0 }
 <h3>Does it work outside North America?</h3>
 <p>Yes. Open-Meteo and 7timer.info are global. SDSS coverage is limited to the northern sky; for southern hemisphere objects the Legacy Survey and DSS fallbacks are used automatically.</p>
 
-<h3>What if the OpenAI key is missing?</h3>
-<p>The card and email still generate fully — a rule-based fallback writes the Game Plan and summary text. The OpenAI key only adds richer narrative language.</p>
+<h3>What is the OpenAI API key and do I need one?</h3>
+<p>It is completely optional — see <a href="#ai">Section 13: AI Game Plan</a> for the full explanation and setup steps.</p>
 
 <h3>Can I use it with a narrowband filter?</h3>
 <p>Yes — the target recommendations still apply. Emission nebulae rank highest and those are exactly the objects that benefit most from a dual-narrowband or Hα filter. The GO/NO-GO score is calculated for broadband imaging, so on nights the score is marginal you may still get good narrowband results since that filter cuts moonlight and light pollution.</p>
