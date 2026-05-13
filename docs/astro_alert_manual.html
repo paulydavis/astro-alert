@@ -580,7 +580,7 @@ hr { border:none; border-top:1px solid #152535; margin:40px 0 }
 <!-- ═══════════════════════════════════════════════════════ EQUIPMENT -->
 <h2 id="equipment">12. Equipment Profile</h2>
 
-<p>Your equipment profile is stored in <code>sites.json</code> under the <code>"equipment"</code> key and can be edited in the app's <strong>Settings → Equipment</strong> section. It appears on every report card and is passed to the AI when generating session game plans.</p>
+<p>Your equipment profile is stored in <code>sites.json</code> under the <code>"equipment"</code> key and can be edited in the app's <strong>Settings → Equipment</strong> section. It appears on every report card header. If you have an OpenAI API key configured, the equipment details are also passed to the AI to personalise the session game plan — otherwise the game plan is generated from a built-in template.</p>
 
 <table>
   <tr><th>Field</th><th>Example</th></tr>
@@ -593,7 +593,7 @@ hr { border:none; border-top:1px solid #152535; margin:40px 0 }
   <tr><td><strong>Field of view (degrees)</strong></td><td>2.3 x 1.6</td></tr>
 </table>
 
-<p>Go to <strong>Settings → Equipment</strong>, fill in the fields for your setup, and click <em>Save Equipment</em>. The information appears on every report card and is used to personalise the AI-written session game plan.</p>
+<p>Go to <strong>Settings → Equipment</strong>, fill in the fields for your setup, and click <em>Save Equipment</em>. The information appears on every report card. If you have an OpenAI API key set up (see the FAQ), it is also used to personalise the session game plan.</p>
 
 <p>The field-of-view value influences which targets score highest. Large emission nebulae (M42, M8) or galaxy groups (M81/M82) that fill a 2–3° frame rank above small objects that would need significant cropping.</p>
 
