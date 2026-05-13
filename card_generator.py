@@ -448,9 +448,10 @@ def _chromium_executable() -> Optional[str]:
         return None
     base = Path(sys._MEIPASS)  # type: ignore[attr-defined]
     for candidate in [
-        base / "chromium" / "chrome",
-        base / "chromium" / "chrome.exe",
-        base / "chromium" / "Chromium.app" / "Contents" / "MacOS" / "Chromium",
+        base / "chromium" / "chrome-win" / "chrome.exe",   # Windows Playwright layout
+        base / "chromium" / "chrome",                       # Linux
+        base / "chromium" / "chrome.exe",                   # Windows flat (fallback)
+        base / "chromium" / "Chromium.app" / "Contents" / "MacOS" / "Chromium",  # macOS
     ]:
         if candidate.exists():
             return str(candidate)

@@ -2169,6 +2169,7 @@ class AstroAlertApp(tk.Tk):
             output_dir = DATA_DIR / "report_cards"
             weights = load_weights()
             generated: list[tuple[str, _Path]] = []
+            first_error: str = ""
 
             for i, site in enumerate(sites):
                 self.after(0, self._card_status_var.set,
@@ -2202,9 +2203,15 @@ class AstroAlertApp(tk.Tk):
                 except Exception as site_exc:
                     import logging as _log
                     _log.getLogger(__name__).warning(
-                        "Card generation failed for %s: %s", site.name, site_exc
+                        "Card generation failed for %s: %s", site.name, site_exc,
+                        exc_info=True,
                     )
+                    if not first_error:
+                        first_error = f"{site.name}: {site_exc}"
 
+            if not generated and first_error:
+                self.after(0, self._card_gen_done, [], first_error)
+                return
             self.after(0, self._card_gen_done, generated, "")
         except Exception as exc:
             self.after(0, self._card_gen_done, [], str(exc))
