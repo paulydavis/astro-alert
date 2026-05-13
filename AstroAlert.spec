@@ -143,8 +143,8 @@ if sys.platform == "darwin":
         info_plist={
             'CFBundleName':            'AstroAlert',
             'CFBundleDisplayName':     'Astro Alert',
-            'CFBundleVersion':         '1.4.2',
-            'CFBundleShortVersionString': '1.4.2',
+            'CFBundleVersion':         '1.4.3',
+            'CFBundleShortVersionString': '1.4.3',
             'NSHighResolutionCapable': True,
             'LSMinimumSystemVersion':  '10.13.0',
         },
