@@ -550,5 +550,5 @@ def generate_site_card(
         return render_card_png(html, out_path), ai_used
 
     except Exception as exc:
-        _log.error("Card generation failed for %s: %s", card.site_name, exc)
-        return None, False
+        _log.error("Card generation failed for %s: %s", card.site_name, exc, exc_info=True)
+        raise
