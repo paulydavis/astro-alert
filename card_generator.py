@@ -460,6 +460,40 @@ def _chromium_executable() -> Optional[str]:
     return None
 
 
+def _ensure_chromium() -> Optional[str]:
+    """Return chromium executable path, auto-installing via playwright if needed."""
+    exe = _chromium_executable()
+    if exe:
+        return exe
+    # Not bundled (macOS frozen app or dev mode) — check standard Playwright locations.
+    import sys as _sys
+    search_roots = []
+    if _sys.platform == "win32":
+        import os as _os
+        search_roots.append(Path(_os.environ.get("LOCALAPPDATA", "")) / "ms-playwright")
+    else:
+        search_roots += [
+            Path.home() / ".cache" / "ms-playwright",
+            Path.home() / "Library" / "Caches" / "ms-playwright",
+        ]
+    for root in search_roots:
+        if root.exists():
+            for chromium_dir in sorted(root.glob("chromium-*"), reverse=True):
+                for candidate in [
+                    chromium_dir / "chrome-mac-arm64" / "Google Chrome for Testing.app" / "Contents" / "MacOS" / "Google Chrome for Testing",
+                    chromium_dir / "chrome-mac-x64" / "Google Chrome for Testing.app" / "Contents" / "MacOS" / "Google Chrome for Testing",
+                    chromium_dir / "chrome-win" / "chrome.exe",
+                    chromium_dir / "chrome",
+                ]:
+                    if candidate.exists():
+                        return str(candidate)
+    # Nothing found — auto-install (happens once on first use).
+    _log.info("Chromium not found, running playwright install chromium…")
+    import subprocess as _sp
+    _sp.run([_sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+    return _ensure_chromium()  # retry after install
+
+
 def render_card_png(html: str, output_path: Path) -> Path:
     """Render the HTML card to a PNG using playwright (sync API)."""
     import os
@@ -468,10 +502,9 @@ def render_card_png(html: str, output_path: Path) -> Path:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # When bundled, point Playwright at the embedded browser.
-    chromium_exe = _chromium_executable()
+    chromium_exe = _ensure_chromium()
     if chromium_exe:
-        os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(Path(chromium_exe).parent.parent.parent))
+        os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(Path(chromium_exe).parent.parent.parent.parent.parent))
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(executable_path=chromium_exe)

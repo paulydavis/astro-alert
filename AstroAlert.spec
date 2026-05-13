@@ -48,7 +48,9 @@ def _find_chromium():
                 return [(str(chromium_dir), "chromium")]
     return []
 
-_chromium_datas = _find_chromium()
+# macOS: don't bundle Chromium — PyInstaller can't codesign nested Chrome frameworks.
+# The app will auto-install Chromium via playwright on first card generation.
+_chromium_datas = [] if sys.platform == "darwin" else _find_chromium()
 
 a = Analysis(
     ['main.py'],
