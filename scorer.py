@@ -20,6 +20,10 @@ class Score:
     summary: str
     warnings: list[str]
     avg_cloud_pct: int = -1
+    avg_wind_kmh: float = -1
+    precip_expected: bool = False
+    avg_seeing: float = -1      # 1–8 scale
+    avg_transparency: float = -1  # 1–8 scale
 
 
 def _imaging_hours(target_date: date) -> set[datetime]:
@@ -41,7 +45,7 @@ def _weather_score(
     bortle: int,
     target_date: Optional[date] = None,
     weights: Optional[ScoringWeights] = None,
-) -> tuple[float, list[str], int]:
+) -> tuple[float, list[str], int, float, bool]:
     """Return (weather_norm 0–1, warnings, avg_cloud_pct)."""
     if weights is None:
         weights = ScoringWeights()
@@ -49,7 +53,7 @@ def _weather_score(
     warnings = []
     if not result.ok or not result.hours:
         warnings.append("Weather data unavailable")
-        return 0.5, warnings, -1
+        return 0.5, warnings, -1, -1.0, False
 
     if target_date:
         window = _imaging_hours(target_date)
@@ -85,7 +89,7 @@ def _weather_score(
 
     if any_precip:
         warnings.append("Precipitation expected")
-        return 0.0, warnings, int(avg_cloud)
+        return 0.0, warnings, int(avg_cloud), avg_wind, True
 
     # Wind raw
     if avg_wind > 30:
@@ -117,14 +121,14 @@ def _weather_score(
         + weights.dew_weight * dew_raw
     ) / total_w
 
-    return weather_norm, warnings, int(avg_cloud)
+    return weather_norm, warnings, int(avg_cloud), avg_wind, False
 
 
 def _seeing_score(
     result: SeeingResult,
     target_date: Optional[date] = None,
     weights: Optional[ScoringWeights] = None,
-) -> tuple[float, list[str]]:
+) -> tuple[float, list[str], float, float]:
     """Return (seeing_norm 0–1, warnings)."""
     if weights is None:
         weights = ScoringWeights()
@@ -132,7 +136,7 @@ def _seeing_score(
     warnings = []
     if not result.ok or not result.hours:
         warnings.append("Seeing data unavailable")
-        return 0.5, warnings
+        return 0.5, warnings, -1.0, -1.0
 
     if target_date:
         window = _imaging_hours(target_date)
@@ -159,7 +163,7 @@ def _seeing_score(
         + weights.transparency_weight * transp_raw
     ) / total_w
 
-    return seeing_norm, warnings
+    return seeing_norm, warnings, avg_seeing, avg_transparency
 
 
 def _dark_hours_after_moonset(info: MoonInfo) -> float:
@@ -243,8 +247,8 @@ def score_night(
         weights = ScoringWeights()
     threshold = go_threshold if go_threshold is not None else weights.go_threshold
 
-    w_norm, w_warn, avg_cloud = _weather_score(weather, bortle, target_date, weights)
-    s_norm, s_warn = _seeing_score(seeing, target_date, weights)
+    w_norm, w_warn, avg_cloud, avg_wind, precip_expected = _weather_score(weather, bortle, target_date, weights)
+    s_norm, s_warn, avg_seeing, avg_transparency = _seeing_score(seeing, target_date, weights)
     m_norm, m_warn = _moon_score(moon, weights)
 
     total_w = weights.weather_weight + weights.seeing_weight + weights.moon_weight
@@ -280,4 +284,8 @@ def score_night(
         summary=summary,
         warnings=all_warnings,
         avg_cloud_pct=avg_cloud,
+        avg_wind_kmh=avg_wind,
+        precip_expected=precip_expected,
+        avg_seeing=avg_seeing,
+        avg_transparency=avg_transparency,
     )

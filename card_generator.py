@@ -159,6 +159,64 @@ def _score_cls(v: int) -> str:
     return "good" if v >= 70 else ("ok" if v >= 45 else "poor")
 
 
+def _tile(label: str, value: str, cls: str, sub: str = "") -> str:
+    sub_html = f'<div class="ctile-sub">{_esc.escape(sub)}</div>' if sub else ""
+    return (
+        f'<div class="ctile ctile-{cls}">'
+        f'<div class="ctile-label">{label}</div>'
+        f'<div class="ctile-value">{value}</div>'
+        f'{sub_html}</div>'
+    )
+
+
+def _cond_tiles(score, moon_pct: float, bortle: int) -> str:
+    tiles = []
+
+    # Cloud cover
+    c = score.avg_cloud_pct
+    if c >= 0:
+        cls = "green" if c < 25 else ("amber" if c < 50 else "red")
+        tiles.append(_tile("Cloud Cover", f"{c}%", cls))
+    else:
+        tiles.append(_tile("Cloud Cover", "—", "neutral"))
+
+    # Wind
+    w = score.avg_wind_kmh
+    if w >= 0:
+        mph = w * 0.621371
+        cls = "green" if w <= 20 else ("amber" if w <= 30 else "red")
+        sub = "precipitation" if score.precip_expected else ""
+        tiles.append(_tile("Wind", f"{mph:.0f} mph", cls, sub))
+    else:
+        tiles.append(_tile("Wind", "—", "neutral"))
+
+    # Seeing
+    s = score.avg_seeing
+    if s >= 0:
+        cls = "green" if s >= 6 else ("amber" if s >= 4 else "red")
+        tiles.append(_tile("Seeing", f"{s:.1f}/8", cls))
+    else:
+        tiles.append(_tile("Seeing", "—", "neutral"))
+
+    # Transparency
+    t = score.avg_transparency
+    if t >= 0:
+        cls = "green" if t >= 6 else ("amber" if t >= 4 else "red")
+        tiles.append(_tile("Transparency", f"{t:.1f}/8", cls))
+    else:
+        tiles.append(_tile("Transparency", "—", "neutral"))
+
+    # Moon
+    cls = "green" if moon_pct < 25 else ("amber" if moon_pct < 50 else "red")
+    tiles.append(_tile("Moon", f"{moon_pct:.0f}%", cls, "illuminated"))
+
+    # Bortle / light pollution
+    cls = "green" if bortle <= 4 else ("amber" if bortle <= 6 else "red")
+    tiles.append(_tile("Light Pollution", f"Bortle {bortle}", cls))
+
+    return '<div class="cond-grid">' + "".join(tiles) + "</div>"
+
+
 def _dominant_type(targets: list) -> str:
     if not targets:
         return "DEEP-SKY"
@@ -260,19 +318,28 @@ body { width:900px; background:#08101c; color:#fff;
            display:flex; justify-content:space-between; font-size:10px }
 .ttime { color:#a0c0d8 }
 .talt  { color:#607080 }
+.cond-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+             padding:0 28px 14px }
+.ctile { border-radius:6px; padding:14px 10px; display:flex; flex-direction:column;
+         align-items:center; justify-content:center; text-align:center; min-height:86px }
+.ctile-label { font-size:9px; font-weight:700; letter-spacing:1.5px;
+               text-transform:uppercase; opacity:0.65; margin-bottom:6px }
+.ctile-value { font-size:26px; font-weight:800; line-height:1 }
+.ctile-sub   { font-size:9px; opacity:0.55; margin-top:5px }
+.ctile-green   { background:#091f0e; border:1px solid #174020 }
+.ctile-green   .ctile-value { color:#3dba50 }
+.ctile-amber   { background:#1e1800; border:1px solid #4a3c00 }
+.ctile-amber   .ctile-value { color:#f0c040 }
+.ctile-red     { background:#1f0909; border:1px solid #4a1515 }
+.ctile-red     .ctile-value { color:#e05050 }
+.ctile-neutral { background:#0c1828; border:1px solid #152535 }
+.ctile-neutral .ctile-value { color:#90b0c8 }
 .bottom { display:grid; grid-template-columns:1fr 1fr; gap:10px;
           padding:0 28px 14px }
 .bcard { background:#0c1828; border:1px solid #152535; border-radius:6px;
          padding:14px }
 .btitle { font-size:11px; font-weight:700; letter-spacing:1.5px; color:#406080;
           text-transform:uppercase; margin-bottom:10px }
-.crow { display:flex; justify-content:space-between; align-items:center;
-        padding:4px 0; font-size:12px; border-bottom:1px solid #0f1e2e }
-.clabel { color:#607080 }
-.cval { font-weight:600 }
-.good { color:#3dba50 }
-.ok   { color:#f0c040 }
-.poor { color:#e05050 }
 .gpitem { display:flex; gap:10px; align-items:flex-start; padding:5px 0;
           font-size:12px; color:#90b0c8; border-bottom:1px solid #0f1e2e }
 .gpnum { background:#102040; color:#4080c0; width:20px; height:20px;
@@ -368,20 +435,8 @@ def build_card_html(card: CardInput, narrative: dict, dso_image_uris: dict[str, 
             '</div>'
         )
 
-    # Conditions
-    cond_rows = [
-        ("Weather", f"{card.score.weather_score}%", _score_cls(card.score.weather_score)),
-        ("Seeing",  f"{card.score.seeing_score}%",  _score_cls(card.score.seeing_score)),
-        ("Light Pollution", f"Bortle {card.site_bortle}",
-         _score_cls(max(0, 100 - (card.site_bortle - 1) * 12))),
-        ("Moon",    f"{moon.phase_pct:.0f}%",        _score_cls(card.score.moon_score)),
-        ("Overall", f"{card.score.total}/100",       _score_cls(card.score.total)),
-    ]
-    cond_html = "".join(
-        f'<div class="crow"><span class="clabel">{r[0]}</span>'
-        f'<span class="cval {r[2]}">{r[1]}</span></div>'
-        for r in cond_rows
-    )
+    # Condition tile grid
+    cond_tiles_html = _cond_tiles(card.score, moon.phase_pct, card.site_bortle)
 
     # Game plan
     game_plan = narrative.get("game_plan", [])
@@ -418,18 +473,14 @@ def build_card_html(card: CardInput, narrative: dict, dso_image_uris: dict[str, 
   </div>
 </div>
 
+<div class="sec">Tonight&apos;s Conditions</div>
+{cond_tiles_html}
+
 {no_targets_msg}{top_section}{mid_section}{late_section}
 
-<div class="sec">Tonight&apos;s Conditions &amp; Game Plan</div>
-<div class="bottom">
-  <div class="bcard">
-    <div class="btitle">Conditions</div>
-    {cond_html}
-  </div>
-  <div class="bcard">
-    <div class="btitle">Game Plan · {equip}</div>
-    {gp_html}
-  </div>
+<div class="sec">Game Plan · {equip}</div>
+<div style="padding:0 28px 14px">
+  {gp_html}
 </div>
 
 <div class="divider"></div>
