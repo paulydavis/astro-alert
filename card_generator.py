@@ -462,11 +462,13 @@ def _chromium_executable() -> Optional[str]:
 
 def _ensure_chromium() -> Optional[str]:
     """Return chromium executable path, auto-installing via playwright if needed."""
+    import sys as _sys
+
     exe = _chromium_executable()
     if exe:
         return exe
-    # Not bundled (macOS frozen app or dev mode) — check standard Playwright locations.
-    import sys as _sys
+
+    # Check standard Playwright install locations.
     search_roots = []
     if _sys.platform == "win32":
         import os as _os
@@ -487,7 +489,31 @@ def _ensure_chromium() -> Optional[str]:
                 ]:
                     if candidate.exists():
                         return str(candidate)
-    # Nothing found — auto-install (happens once on first use).
+
+    # On Windows also check for a system Chrome or Edge install.
+    if _sys.platform == "win32":
+        import os as _os
+        pf  = _os.environ.get("PROGRAMFILES",      "C:/Program Files")
+        pf86 = _os.environ.get("PROGRAMFILES(X86)", "C:/Program Files (x86)")
+        for candidate in [
+            Path(pf)   / "Google/Chrome/Application/chrome.exe",
+            Path(pf86) / "Google/Chrome/Application/chrome.exe",
+            Path(pf)   / "Microsoft/Edge/Application/msedge.exe",
+            Path(pf86) / "Microsoft/Edge/Application/msedge.exe",
+        ]:
+            if candidate.exists():
+                _log.info("Using system browser: %s", candidate)
+                return str(candidate)
+
+    # In a frozen (PyInstaller) app sys.executable is the .exe itself, so
+    # `sys.executable -m playwright install` cannot work — raise a clear error.
+    if getattr(_sys, "frozen", False):
+        raise RuntimeError(
+            "Report Card requires a Chromium-based browser. "
+            "Please install Google Chrome or Microsoft Edge and try again."
+        )
+
+    # Dev / non-frozen — auto-install once.
     _log.info("Chromium not found, running playwright install chromium…")
     import subprocess as _sp
     _sp.run([_sys.executable, "-m", "playwright", "install", "chromium"], check=True)
